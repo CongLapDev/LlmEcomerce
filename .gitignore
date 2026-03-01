@@ -1,0 +1,9 @@
+.env
+application-local-secrets.yml
+# Environment variables
+nhs-app/src/main/resources/.env
+.env
+.idea/
+Ecommerce/nhs-app/src/main/resources/env
+.agent/
+.vscode/

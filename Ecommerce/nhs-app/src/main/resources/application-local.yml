@@ -1,0 +1,53 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: WebServices_user
+    url: jdbc:mysql://localhost:3307/WebServices?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+    password: 123
+  security:
+    oauth2:
+          client:
+            registration:
+              google:
+                client-id: ${GOOGLE_CLIENT_ID}
+                client-secret: ${GOOGLE_CLIENT_SECRET}
+                authorization-grant-type: authorization_code
+                redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+                scope:
+                  - email
+                  - profile
+payment:
+  zalo:
+    app-id: 2554
+    key1: ${ZALOPAY_KEY1:sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn}
+    key2: ${ZALOPAY_KEY2:trMrHtvjo6myautxDUiAcYsVtaeQ8nhf}
+    endpoints:
+      # ZaloPay Sandbox v2 API endpoints
+      create: https://sb-openapi.zalopay.vn/v2/create
+      query: https://sb-openapi.zalopay.vn/v2/query
+      refund: https://sandbox.zalopay.com.vn/v001/tpe/partialrefund
+      refund-status: https://sandbox.zalopay.com.vn/v001/tpe/getpartialrefundstatus
+    callback-url: ${APP_BASE_URL:http://localhost:8085}/api/v1/purchase/zalopay/callback
+    redirect-url: ${FRONTEND_URL:http://localhost:3000}/zalopay/result
+    payment-timeout-minutes: 15
+    polling-interval-seconds: 15
+    max-polling-attempts: 60
+  # VnPay configuration commented out - not needed for sandbox
+  # vnpay:
+  #   version: 2.1.0
+  #   payurl: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+  #   returnurl: /vnpay-payment
+  #   apiUrl: https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
+  #   tmnCode: "CTTVNP01"
+  #   vnp_HashSecret: "hgkdgkd"
+server:
+  port: 8085
+# Frontend URL for OAuth redirect (localhost for development)
+frontend:
+  url: http://localhost:3000
+nhs:
+  token:
+    # JWT Secret Key - MUST be at least 32 characters (256 bits) for HS256
+    # This must match the secret used in application-common.yml
+    # IMPORTANT: Use a strong, random secret key in production
+    secret: "MySuperSecretJWTKeyForHS256AlgorithmMustBeAtLeast32CharactersLong123456789012345678901234567890"

@@ -1,0 +1,22 @@
+spring:
+  session:
+    jdbc:
+      initialize-schema: always
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: true
+  mvc:
+    dispatch-options-request: true
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
+#token time configuration
+nhs:
+  token:
+    accessTokenms: 720000000
+    refreshTokenms: 6048000
+    # JWT Secret Key - MUST be at least 32 characters (256 bits) for HS256
+    # IMPORTANT: Use a strong, random secret key in production
+    # Generate with: openssl rand -base64 32
+    secret: "MySuperSecretJWTKeyForHS256AlgorithmMustBeAtLeast32CharactersLong123456789012345678901234567890"

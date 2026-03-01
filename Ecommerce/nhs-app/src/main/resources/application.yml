@@ -1,0 +1,34 @@
+spring:
+  profiles:
+    active: local
+  config:
+    import: optional:classpath:application-common.yml
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3307/WebServices?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false&characterEncoding=UTF-8&useUnicode=true
+    username: WebServices_user
+    password: 123
+  jpa:
+    hibernate:
+      ddl-auto: update
+    generate-ddl: true
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+      enabled: true
+  web:
+    resources:
+      static-locations: file:uploads/
+server:
+  port: 8085
+file:
+  upload-dir: uploads
+nhs:
+  token:
+    accessTokenms: 3600000
+    refreshTokenms: 7200000
+    secret: "MySuperSecretJWTKeyForHS256AlgorithmMustBeAtLeast32CharactersLong123456789012345678901234567890"

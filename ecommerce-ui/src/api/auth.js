@@ -1,0 +1,337 @@
+import APIBase from "./ApiBase";
+
+// Helper to persist any access token the backend might return
+// Note: Backend uses cookies (httpOnly), but we also try to extract from response for Authorization header
+const persistTokenFromResponse = (response) => {
+  if (!response) {
+    console.warn("[auth] persistTokenFromResponse: No response provided");
+    return;
+  }
+  
+  // Debug: Log entire response structure to see where token might be
+  console.log("[TOKEN DEBUG] Response structure:", {
+    hasData: !!response.data,
+    dataKeys: response.data ? Object.keys(response.data) : [],
+    hasHeaders: !!response.headers,
+    headerKeys: response.headers ? Object.keys(response.headers) : [],
+    fullResponse: response
+  });
+  
+  // CRITICAL: Backend sets token in X-Auth-Token and Authorization headers (see AuthService.signInWithUserDetails)
+  // We MUST extract the token to store in localStorage for subsequent requests
+  // Try multiple locations for the token in response (priority order matters)
+  
+  // First: Check X-Auth-Token header (backend explicitly sets this)
+  let token = response.headers?.["x-auth-token"] || 
+              response.headers?.["X-Auth-Token"] ||
+              response.headers?.["X-AUTH-TOKEN"];
+  
+  // Second: Check Authorization header (backend also sets this)
+  if (!token) {
+    const authHeader = response.headers?.authorization || 
+                       response.headers?.Authorization || 
+                       response.headers?.AUTHORIZATION;
+    if (authHeader) {
+      // Remove "Bearer " prefix if present
+      token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    }
+  }
+  
+  // Third: Check response body
+  if (!token) {
+    token = response.data?.token ||
+            response.data?.accessToken ||
+            response.data?.access_token ||
+            response.data?.jwt;
+  }
+  
+  // Last resort: Try to extract from Set-Cookie header (usually won't work for httpOnly cookies)
+  if (!token && response.headers?.["set-cookie"]) {
+    const cookies = Array.isArray(response.headers["set-cookie"]) 
+      ? response.headers["set-cookie"] 
+      : [response.headers["set-cookie"]];
+    for (const cookie of cookies) {
+      const match = cookie.match(/(?:^|;\s*)(?:accessToken|token|jwt)=([^;]+)/i);
+      if (match) {
+        token = match[1];
+        break;
+      }
+    }
+  }
+  
+  if (token) {
+    // CRITICAL: Strip Bearer prefix if present (should already be removed, but double-check)
+    let normalized = token.startsWith("Bearer ") 
+      ? token.substring(7).trim() 
+      : token.trim();
+    
+    // Additional cleanup: remove any whitespace
+    normalized = normalized.trim();
+    
+    if (normalized && normalized.length > 0) {
+      // CRITICAL: Save to localStorage - this is what the interceptor reads
+      window.localStorage.setItem("AUTH_TOKEN", normalized);
+      
+      // Verify it was saved
+      const saved = window.localStorage.getItem("AUTH_TOKEN");
+      if (saved === normalized) {
+        console.log("[TOKEN] ✓✓✓ Token extracted and saved to localStorage");
+        console.log("[TOKEN] Token source:", 
+          response.headers?.["x-auth-token"] || response.headers?.["X-Auth-Token"] ? "X-Auth-Token header" :
+          response.headers?.authorization || response.headers?.Authorization ? "Authorization header" :
+          response.data?.token ? "response.data.token" :
+          response.data?.accessToken ? "response.data.accessToken" :
+          response.data?.jwt ? "response.data.jwt" :
+          "unknown");
+        console.log("[TOKEN] Token length:", normalized.length);
+        console.log("[TOKEN] Token (first 30 chars):", normalized.slice(0, 30) + "...");
+        console.log("[TOKEN] ✓ Verification: Token in localStorage matches saved token");
+        return true; // Indicate success
+      } else {
+        console.error("[TOKEN] ❌ ERROR: Token saved but verification failed!");
+        console.error("[TOKEN] Expected:", normalized.slice(0, 30) + "...");
+        console.error("[TOKEN] Got:", saved ? saved.slice(0, 30) + "..." : "null");
+        return false;
+      }
+    } else {
+      console.error("[TOKEN] ❌ Token found but is empty after normalization");
+      console.error("[TOKEN] Original token:", token ? token.slice(0, 50) + "..." : "null");
+      return false;
+    }
+  } else {
+    // Backend uses cookies, so token might not be in response body/headers
+    // Log all possible locations for debugging
+    console.warn("[TOKEN DEBUG] Token not found in any expected location:");
+    console.warn("[TOKEN DEBUG] - response.data?.token:", response.data?.token);
+    console.warn("[TOKEN DEBUG] - response.data?.accessToken:", response.data?.accessToken);
+    console.warn("[TOKEN DEBUG] - response.headers?.authorization:", response.headers?.authorization);
+    console.warn("[TOKEN DEBUG] - response.headers?.Authorization:", response.headers?.Authorization);
+    console.warn("[TOKEN DEBUG] - response.headers?.set-cookie:", response.headers?.["set-cookie"]);
+    console.warn("[TOKEN DEBUG] Backend uses httpOnly cookies - token cannot be read by JavaScript");
+    console.warn("[TOKEN DEBUG] If backend only uses cookies, we need backend to also return token in response body/header");
+    return false; // Indicate failure
+  }
+};
+
+// Authentication API services
+
+/**
+ * Login API - Authenticates user and returns User object with account and roles
+ * @param {Object} credentials - { username: string, password: string }
+ * @returns {Promise<User>} User object with account.roles
+ */
+export const login = async (credentials) => {
+  console.log("[AUTH API] ===== login() called =====");
+  console.log("[AUTH API] Credentials:", { username: credentials.username, password: "***" });
+  console.log("[AUTH API] Endpoint: POST /api/auth/login");
+  console.log("[AUTH API] Base URL:", APIBase.defaults.baseURL);
+  console.log("[AUTH API] Full URL:", `${APIBase.defaults.baseURL}/api/auth/login`);
+  
+  try {
+    // Use REST-style /api/auth/login endpoint
+    console.log("[AUTH API] Sending request to backend...");
+    const response = await APIBase.post("/api/auth/login", credentials, {
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+        "Accept": "application/json"
+      }
+    });
+    
+    console.log("[AUTH API] ✓ Response received");
+    console.log("[AUTH API] Response status:", response.status);
+    console.log("[AUTH API] Response headers:", response.headers);
+    console.log("[AUTH API] Response data keys:", response.data ? Object.keys(response.data) : []);
+    console.log("[AUTH API] Response data:", response.data);
+    
+    // Log token information
+    const tokenBefore = response.data?.token ||
+      response.data?.accessToken ||
+      response.headers?.authorization ||
+      response.headers?.Authorization ||
+      response.headers?.["authorization"] ||
+      response.headers?.["Authorization"];
+    
+    if (tokenBefore) {
+      const normalized = tokenBefore.startsWith("Bearer ") ? tokenBefore.substring(7) : tokenBefore;
+      console.log("[TOKEN] token from server:", normalized.slice(0, 20) + "...");
+    } else {
+      console.warn("[TOKEN] No token found in response body/headers");
+    }
+    
+    // Save token from response
+    persistTokenFromResponse(response);
+    
+    // Verify token was saved
+    const savedToken = window.localStorage.getItem("AUTH_TOKEN");
+    
+    if (savedToken) {
+      console.log("[TOKEN] token saved to localStorage");
+    } else {
+      // Token not found - provide detailed error information
+      console.error("[TOKEN ERROR] ========================================");
+      console.error("[TOKEN ERROR] Token not returned by backend");
+      console.error("[TOKEN ERROR] ========================================");
+      console.error("[TOKEN ERROR] Response status:", response.status);
+      console.error("[TOKEN ERROR] Response data:", response.data);
+      console.error("[TOKEN ERROR] Response data keys:", response.data ? Object.keys(response.data) : []);
+      console.error("[TOKEN ERROR] Response headers:", response.headers);
+      console.error("[TOKEN ERROR] Response header keys:", response.headers ? Object.keys(response.headers) : []);
+      console.error("[TOKEN ERROR] ========================================");
+      console.error("[TOKEN ERROR] Backend must return token in one of these locations:");
+      console.error("[TOKEN ERROR] 1. response.data.token");
+      console.error("[TOKEN ERROR] 2. response.data.accessToken");
+      console.error("[TOKEN ERROR] 3. response.headers.authorization");
+      console.error("[TOKEN ERROR] 4. response.headers.Authorization");
+      console.error("[TOKEN ERROR] 5. response.headers['x-auth-token']");
+      console.error("[TOKEN ERROR] ========================================");
+      console.error("[TOKEN ERROR] Current backend only sends token in httpOnly cookies");
+      console.error("[TOKEN ERROR] httpOnly cookies cannot be read by JavaScript");
+      console.error("[TOKEN ERROR] Solution: Backend must ALSO return token in response body or header");
+      console.error("[TOKEN ERROR] ========================================");
+      
+      throw new Error("Token not found in response. Backend must return token in response body or header (not just httpOnly cookies).");
+    }
+    
+    // Return user data with account and roles
+    return response.data;
+  } catch (error) {
+    // Log full error details
+    console.error("[AUTH ERROR] ========================================");
+    console.error("[AUTH ERROR] login() API call failed!");
+    console.error("[AUTH ERROR] ========================================");
+    console.error("[AUTH ERROR] Error message:", error?.message);
+    console.error("[AUTH ERROR] Error code:", error?.code);
+    
+    if (error?.response) {
+      // Server responded with error status
+      console.error("[AUTH ERROR] Server Response Error:");
+      console.error("[AUTH ERROR] - Status:", error.response.status);
+      console.error("[AUTH ERROR] - Status Text:", error.response.statusText);
+      console.error("[AUTH ERROR] - Response Data:", error.response.data);
+      console.error("[AUTH ERROR] - Request URL:", error.config?.url);
+      console.error("[AUTH ERROR] - Request Method:", error.config?.method);
+      console.error("[AUTH ERROR] - Request Base URL:", error.config?.baseURL);
+      console.error("[AUTH ERROR] - Full URL:", error.config?.baseURL + error.config?.url);
+      console.error("[AUTH ERROR] - Request Headers:", error.config?.headers);
+      console.error("[AUTH ERROR] - Request Data:", error.config?.data);
+    } else if (error?.request) {
+      // Request was made but no response received
+      console.error("[AUTH ERROR] Network Error - No response from server:");
+      console.error("[AUTH ERROR] - Request:", error.request);
+      console.error("[AUTH ERROR] - This usually means:");
+      console.error("[AUTH ERROR]   1. Backend server is not running at", APIBase.defaults.baseURL);
+      console.error("[AUTH ERROR]   2. CORS configuration issue");
+      console.error("[AUTH ERROR]   3. Network connectivity problem");
+      console.error("[AUTH ERROR]   4. Firewall blocking the request");
+    } else {
+      // Error setting up request
+      console.error("[AUTH ERROR] Request Setup Error:");
+      console.error("[AUTH ERROR] - Message:", error.message);
+    }
+    
+    console.error("[AUTH ERROR] Full error object:", error);
+    console.error("[AUTH ERROR] ========================================");
+    
+    // If 404, try fallback to /login (legacy endpoint)
+    if (error?.response?.status === 404) {
+      console.log("[AUTH] Trying fallback endpoint /login");
+      try {
+        const response = await APIBase.post("/login", credentials, {
+          headers: { "Content-Type": "application/json" },
+        });
+        
+        // Log token from fallback
+        const tokenBefore = response.data?.token || response.headers?.authorization || response.headers?.Authorization;
+        if (tokenBefore) {
+          const normalized = tokenBefore.startsWith("Bearer ") ? tokenBefore.substring(7) : tokenBefore;
+          console.log("[TOKEN] token from server (fallback):", normalized.slice(0, 20) + "...");
+        }
+        
+        persistTokenFromResponse(response);
+        
+        const savedToken = window.localStorage.getItem("AUTH_TOKEN");
+        if (savedToken) {
+          console.log("[TOKEN] token saved to localStorage (fallback)");
+        } else {
+          console.error("[TOKEN ERROR] Token not returned by backend (fallback)");
+        }
+        
+        // Legacy endpoint doesn't return user data, so fetch it
+        const userData = await getCurrentUser();
+        return userData;
+      } catch (fallbackError) {
+        console.error("[AUTH ERROR] Fallback login endpoint also failed:", {
+          message: fallbackError?.message,
+          status: fallbackError?.response?.status,
+          statusText: fallbackError?.response?.statusText,
+          data: fallbackError?.response?.data,
+          url: fallbackError?.config?.url,
+          method: fallbackError?.config?.method,
+          fullError: fallbackError
+        });
+        throw fallbackError;
+      }
+    }
+    throw error;
+  }
+};
+
+export const register = async (account) => {
+  // Backend exposes registration at POST /register (AuthenticationAPI.register)
+  // /api/v1/account is reserved for secured status updates and will return 403 for anonymous users.
+  const response = await APIBase.post("/register", account, {
+    headers: { "Content-Type": "application/json" },
+  });
+  return response.data;
+};
+
+export const getCurrentAccount = async () => {
+  const response = await APIBase.get("/api/v1/auth/account");
+  return response.data;
+};
+
+export const getCurrentUser = async () => {
+  const response = await APIBase.get("/api/v1/auth/user");
+  return response.data;
+};
+
+export const refresh = async () => {
+  const response = await APIBase.get("/refresh");
+  persistTokenFromResponse(response);
+  return response.data;
+};
+
+export const logout = async () => {
+  const response = await APIBase.get("/logout");
+  window.localStorage.removeItem("AUTH_TOKEN");
+  return response.data;
+};
+
+// Forgot password – prefers /api/auth/forgot-password, falls back gracefully
+export const forgotPassword = async (payload) => {
+  try {
+    const response = await APIBase.post(
+      "/api/auth/forgot-password",
+      payload,
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    // If legacy path exists, optionally support it; otherwise surface clear message
+    if (error?.response?.status === 404) {
+      const message =
+        "Forgot password API is not implemented on the backend yet. Please contact support.";
+      const err = new Error(message);
+      err.original = error;
+      throw err;
+    }
+    const message =
+      error?.response?.data?.message ||
+      "An error occurred while sending reset instructions.";
+    const err = new Error(message);
+    err.original = error;
+    throw err;
+  }
+};
