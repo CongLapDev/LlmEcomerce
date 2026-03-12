@@ -156,10 +156,10 @@ function UserCart() {
                             description={
                                 <div>
                                     <p style={{ fontSize: 16, marginBottom: 8 }}>
-                                        <strong>Giỏ hàng của bạn đang trống</strong>
+                                        <strong>Your cart is empty</strong>
                                     </p>
                                     <p style={{ color: '#8c8c8c', marginBottom: 16 }}>
-                                        Bạn đã đặt đơn hàng? Theo dõi trạng thái đơn hàng trong <strong>Lịch sử đơn hàng</strong>
+                                        Already placed an order? Track your order status in <strong>Order History</strong>
                                     </p>
                                     <Space size="middle">
                                         <Button 
@@ -172,12 +172,12 @@ function UserCart() {
                                                 });
                                             }}
                                         >
-                                            Xem đơn hàng của tôi
+                                            View my orders
                                         </Button>
                                         <Button 
                                             onClick={() => navigate("/")}
                                         >
-                                            Tiếp tục mua sắm
+                                            Continue shopping
                                         </Button>
                                     </Space>
                                 </div>
@@ -203,7 +203,7 @@ function UserCart() {
             <Row justify="center"><Spin /></Row>
         </Col>}
         <Col span={24} md={{ span: 10 }} lg={{ span: 9 }}>
-            <Card title="Total" className={style.summaryCard}>
+            <Card title="Summary" className={style.summaryCard}>
                 <h4 className={style.summaryValue}><Currency value={selectedItems.reduce((pre, item) => {
                     return pre + item.qty * item.productItem.price;
                 }, 0)} /></h4>

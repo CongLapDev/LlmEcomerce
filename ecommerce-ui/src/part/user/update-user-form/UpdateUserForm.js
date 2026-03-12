@@ -3,27 +3,55 @@ import { useFormik } from "formik";
 import * as Yup from 'yup';
 import { Error } from "../../../components";
 import PrefixIcon from "../../../components/prefix-icon/PrefixIcon";
+import { useState } from "react";
+
 function UpdateUserForm({ user, onSubmit }) {
+    const [loading, setLoading] = useState(false);
+
     const schema = Yup.object().shape({
-        firstname: Yup.string().required("first name cant be blank"),
-        lastname: Yup.string().required("required"),
-        dateOfBirth: Yup.string().required("required"),
-        phoneNumber: Yup.string().required(),
-        email: Yup.string().email()
+        firstname: Yup.string().required("First name is required"),
+        lastname: Yup.string().required("Last name is required"),
+        dateOfBirth: Yup.string()
+            .required("Date of birth is required")
+            .test('no-future-date', 'Birthday cannot be in the future', function(value) {
+                if (!value) return true;
+                const selectedDate = new Date(value);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return selectedDate <= today;
+            }),
+        phoneNumber: Yup.string().required("Phone number is required"),
+        email: Yup.string().email("Please enter a valid email").required("Email is required")
     });
+
     const formik = useFormik({
         initialValues: {
             firstname: user.firstname,
             lastname: user.lastname,
             dateOfBirth: user.dateOfBirth,
             phoneNumber: user.phoneNumber,
-            email: user.email
+            email: user.email,
+            gender: user.gender || ""
         },
         validationSchema: schema,
-        onSubmit: (data) => {
-            if (onSubmit) onSubmit(data);
+        onSubmit: async (data) => {
+            setLoading(true);
+            try {
+                if (onSubmit) {
+                    await onSubmit(data);
+                }
+            } catch (error) {
+                console.error("Error submitting form:", error);
+            } finally {
+                setLoading(false);
+            }
         }
-    })
+    });
+
+    // Get today's date formatted as YYYY-MM-DD for the max attribute
+    const today = new Date();
+    const maxDate = today.toISOString().split('T')[0];
+
     return (<form onSubmit={formik.handleSubmit}>
         <Row gutter={[16, 16]}>
             <Col span={24} md={{ span: "12" }}>
@@ -60,7 +88,7 @@ function UpdateUserForm({ user, onSubmit }) {
                     type="text"
                     id="email"
                     name="email"
-                    placeholder="email"
+                    placeholder="Email"
                     onChange={formik.handleChange}
                     value={formik.values.email}
                 />
@@ -81,38 +109,45 @@ function UpdateUserForm({ user, onSubmit }) {
                 <Error>{formik.errors.phoneNumber}</Error>
             </Col>
             <Col span={24} md={{ span: "12" }}>
-                <Row>
-                    <Select
-                        size="large"
-                        style={{ width: "100%" }}
-                        name="gender"
-                        placeholder="Gender"
-                        value={formik.values.gender}
-                        onChange={e => formik.setFieldValue('gender', e)}
-                    >
-                        <Select.Option value="Male"></Select.Option>
-                        <Select.Option value="Female"></Select.Option>
-                        <Select.Option value="Other"></Select.Option>
-                    </Select>
-                </Row>
+                <Select
+                    size="large"
+                    style={{ width: "100%" }}
+                    name="gender"
+                    placeholder="Gender"
+                    value={formik.values.gender || undefined}
+                    onChange={e => formik.setFieldValue('gender', e)}
+                >
+                    <Select.Option value="Male">Male</Select.Option>
+                    <Select.Option value="Female">Female</Select.Option>
+                    <Select.Option value="Other">Other</Select.Option>
+                </Select>
                 <Error>{formik.errors.gender}</Error>
             </Col>
-            <Col span={24} md={{ span: "12" }} >
+            <Col span={24} md={{ span: "12" }}>
                 <Input
                     type="date"
                     size="large"
                     name="dateOfBirth"
                     placeholder="Date of Birth"
                     value={formik.values.dateOfBirth}
+                    max={maxDate}
                     status={(formik.errors.dateOfBirth) ? "error" : ""}
                     onChange={(e) => { formik.setFieldValue('dateOfBirth', e.target.value) }}
                 />
-
                 <Error>{formik.errors.dateOfBirth}</Error>
             </Col>
-            <Row justify="end">
-                <Button htmlType="submit" type="primary">Submit</Button>
-            </Row>
+            <Col span={24}>
+                <Row justify="end">
+                    <Button 
+                        htmlType="submit" 
+                        type="primary"
+                        loading={loading}
+                        disabled={loading}
+                    >
+                        {loading ? "Updating..." : "Submit"}
+                    </Button>
+                </Row>
+            </Col>
         </Row>
     </form>);
 }

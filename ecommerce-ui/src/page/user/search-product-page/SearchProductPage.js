@@ -1,4 +1,5 @@
-import { Col, Flex, Pagination, Row, Select } from "antd";
+import { Button, Col, Flex, Pagination, Row, Select, Tooltip } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 import { useSearchParams } from "react-router-dom";
 import ProductFilter from "../../../part/user/product-filter/ProductFilter";
 import { useContext, useEffect, useState } from "react";
@@ -20,6 +21,28 @@ function getAllCategoryIds(category) {
 
 function SearchProductPage() {
     const [urlParams, setUrlParams] = useSearchParams();
+
+    // Derive controlled value for price filter from URL params
+    const priceMin = urlParams.get('price-min');
+    const priceMax = urlParams.get('price-max');
+    const filterValue = priceMin && priceMax
+        ? `${priceMin}-${priceMax}`
+        : priceMin
+            ? priceMin
+            : undefined;
+
+    const handleReset = () => {
+        setUrlParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.delete('price-min');
+            newParams.delete('price-max');
+            newParams.delete('orderBy');
+            newParams.delete('order');
+            newParams.set('page', '0');
+            return newParams;
+        });
+    };
+
     const [data, setData] = useState({
         content: [],
         pageable: {
@@ -118,31 +141,56 @@ function SearchProductPage() {
             <Col span={24}>
                 <Row className={style.filter} gutter={[16, 16]}>
                     <Col span={12} md={{ span: 8 }} style={{ overflowX: "scroll" }}>
-                        <ProductFilter onFilter={params_ => {
-                            setUrlParams(prev => {
-                                const newParams = new URLSearchParams(prev);
-                                params_.entries().forEach(([key, value]) => {
-                                    if (value) newParams.set(key, value);
-                                    else newParams.delete(key);
-                                });
-                                return newParams;
-                            })
-                        }} />
+                        <ProductFilter
+                            value={filterValue}
+                            onFilter={params_ => {
+                                setUrlParams(prev => {
+                                    const newParams = new URLSearchParams(prev);
+                                    params_.entries().forEach(([key, value]) => {
+                                        if (value) newParams.set(key, value);
+                                        else newParams.delete(key);
+                                    });
+                                    newParams.set('page', '0');
+                                    return newParams;
+                                })
+                            }}
+                        />
                     </Col>
                     <Col span={12} md={{ span: 6 }}>
                         <Select
                             style={{ width: "100%" }}
+                            placeholder="Sort by"
+                            value={urlParams.get('order') ? urlParams.get('order').toUpperCase() : "DEFAULT"}
+                            onChange={(value) => {
+                                setUrlParams(prev => {
+                                    const newParams = new URLSearchParams(prev);
+                                    if (value && value !== "DEFAULT") {
+                                        newParams.set('orderBy', 'minPrice');
+                                        newParams.set('order', value);
+                                    } else {
+                                        newParams.delete('orderBy');
+                                        newParams.delete('order');
+                                    }
+                                    newParams.set('page', '0');
+                                    return newParams;
+                                });
+                            }}
                             options={[
-                                {
-                                    label: "From Top",
-                                    value: 1,
-
-                                }, {
-                                    label: "From Bottom",
-                                    value: 2
-                                }
+                                { label: "Default", value: "DEFAULT" },
+                                { label: "Price: High → Low", value: "DESC" },
+                                { label: "Price: Low → High", value: "ASC" }
                             ]}
                         />
+                    </Col>
+                    <Col flex="none">
+                        <Tooltip title="Clear filters & sorting">
+                            <Button
+                                onClick={handleReset}
+                                icon={<ReloadOutlined />}
+                            >
+                                Reset
+                            </Button>
+                        </Tooltip>
                     </Col>
                 </Row>
             </Col>

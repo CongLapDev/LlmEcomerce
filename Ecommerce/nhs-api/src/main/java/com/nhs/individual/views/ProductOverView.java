@@ -1,6 +1,7 @@
 package com.nhs.individual.views;
 
 import com.nhs.individual.domain.Category;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -31,8 +32,12 @@ public class ProductOverView {
     private String manufacturer;
     private Double rate;
     private Integer rate_count;
-    private Double min_price;
-    private Double max_price;
+    @Column(name = "min_price")
+    @JsonProperty("min_price")
+    private Double minPrice;
+    @Column(name = "max_price")
+    @JsonProperty("max_price")
+    private Double maxPrice;
     private Double quantity;
     @Column(name = "category_id",insertable = false,updatable = false)
     private Integer categoryId;

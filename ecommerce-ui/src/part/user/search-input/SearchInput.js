@@ -2,9 +2,10 @@ import Tippy from "@tippyjs/react/headless";
 import style from './style.module.scss';
 import { Col, Button, Skeleton, Empty } from "antd";
 import { memo, useEffect, useRef, useState } from "react";
-import APIBase from "../../../api/ApiBase";
+import APIBase, { getImageUrl } from "../../../api/ApiBase";
 import { debounce } from "lodash";
 import { Link, useNavigate } from "react-router-dom";
+import PlaceHolder from "../../../assets/image/product_placeholder.png";
 
 function SearchInput({ }) {
     const inputRef = useRef();
@@ -58,7 +59,11 @@ function SearchInput({ }) {
                         {products.content.map(product_ => {
                             return (<Link to={`/product?id=${product_.id}`} onClick={() => setVisible(false)} className={style.productItem} >
                                 <div className={style.picture}>
-                                    <img src={product_.picture} />
+                                    <img
+                                        src={getImageUrl(product_.picture) || PlaceHolder}
+                                        alt={product_.name || "Product"}
+                                        onError={e => { e.currentTarget.src = PlaceHolder; }}
+                                    />
                                 </div>
                                 <div className={style.spec}>
                                     <div className={style.name} span={24}>{product_.name}</div>

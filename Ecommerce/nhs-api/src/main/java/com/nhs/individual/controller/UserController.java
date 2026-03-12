@@ -8,16 +8,19 @@ import com.nhs.individual.exception.ResourceNotFoundException;
 import com.nhs.individual.secure.CurrentUser;
 import com.nhs.individual.secure.IUserDetail;
 import com.nhs.individual.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping(value = "/api/v1/user")
+@Validated
 public class UserController {
     @Autowired
     private UserService userService;
@@ -35,7 +38,7 @@ public class UserController {
     }
     @RequestMapping(value = "/{id}",method=RequestMethod.PUT)
     @PreAuthorize("#id==authentication.principal.userId or hasAuthority('ROLE_ADMIN')")
-    public User update(@PathVariable(value = "id") Integer id, @RequestBody User user) {
+    public User update(@PathVariable(value = "id") Integer id, @Valid @RequestBody User user) {
         user.setId(id);
         return userService.update(user);
     }

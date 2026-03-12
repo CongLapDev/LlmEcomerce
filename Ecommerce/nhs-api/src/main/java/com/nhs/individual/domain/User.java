@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.nhs.individual.dto.AccountDto;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.PastOrPresent;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -34,6 +35,7 @@ public class User {
     protected String lastname;
 
     @Column(name = "date_of_birth")
+    @PastOrPresent(message = "Birthday cannot be in the future")
     protected Date dateOfBirth;
 
     @Column(name = "gender", length = 10)

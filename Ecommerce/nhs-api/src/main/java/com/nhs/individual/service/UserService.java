@@ -14,6 +14,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,14 @@ public class UserService {
     }
 
     public User update(User user){
+        // Validate that birthday is not in the future
+        if (user.getDateOfBirth() != null) {
+            LocalDate birthDate = user.getDateOfBirth().toLocalDate();
+            if (birthDate.isAfter(LocalDate.now())) {
+                throw new IllegalArgumentException("Birthday cannot be in the future");
+            }
+        }
+
         userRepository.findAllByEmailOrPhoneNumber(user.getId(),user.getPhoneNumber(),user.getEmail())
                  .ifPresent((user_)->{
                      throw new IllegalArgumentException("Phone or email is existed");});
