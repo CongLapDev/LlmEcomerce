@@ -1,13 +1,17 @@
-import { useContext, useState, useEffect, useMemo } from "react";
+import React, { useContext, useState, useEffect, useMemo } from "react";
 import { GlobalContext } from "../../../context";
-import APIBase from "../../../api/ApiBase";
-import { Card, Table, Button, Space, Input, Row, Col, Tag, Popconfirm } from "antd";
+import { Space, Input, Tag, Popconfirm } from "antd";
 import { Link } from "react-router-dom";
 import CategoryAddRootModal from "../../../part/admin/category/CategoryAddRootModal";
 import CategoryEditModal from "../../../part/admin/category/CategoryEditModal";
-import PrefixIcon from "../../../components/prefix-icon/PrefixIcon";
 import { deleteCategory } from "../../../api/category";
-import styles from "./style.module.scss";
+import { getCategories } from "../../../services/adminManageService";
+
+import AdminLayout from "../../../components/layout/AdminLayout";
+import PageHeader from "../../../components/ui/PageHeader";
+import CardContainer from "../../../components/ui/CardContainer";
+import DataTable from "../../../components/ui/DataTable";
+import ActionButton from "../../../components/ui/ActionButton";
 
 const getParentId = (category) => {
     if (!category) return null;
@@ -49,44 +53,27 @@ function AdminCategoryManagePage() {
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [searchText, setSearchText] = useState("");
 
-    const fetchData = () => {
+    const fetchData = async () => {
         setLoading(true);
         globalContext.loader(true);
 
-        APIBase.get("api/v1/category/1")
-            .then((payload) => {
-                const rootNode = payload.data;
-                const allNodes = Array.isArray(rootNode?.children) ? rootNode.children : [];
+        const rootNode = await getCategories();
+        const allNodes = Array.isArray(rootNode?.children) ? rootNode.children : [];
 
-                let rootCategories = allNodes.filter((node) => getParentId(node) == null);
+        let rootCategories = allNodes.filter((node) => getParentId(node) == null);
 
-                if (rootCategories.length === 0 && rootNode?.id != null) {
-                    rootCategories = allNodes.filter((node) => getParentId(node) === rootNode.id);
-                }
+        if (rootCategories.length === 0 && rootNode?.id != null) {
+            rootCategories = allNodes.filter((node) => getParentId(node) === rootNode.id);
+        }
 
-                setCategories(rootCategories);
-            })
-            .catch((err) => {
-                console.error(err);
-                globalContext.message.error("Failed to load categories");
-            })
-            .finally(() => {
-                setLoading(false);
-                globalContext.loader(false);
-            });
+        setCategories(rootCategories);
+        setLoading(false);
+        globalContext.loader(false);
     };
 
     useEffect(() => {
         fetchData();
     }, []);
-
-    const handleAddCategory = () => {
-        fetchData();
-    };
-
-    const handleEditCategory = () => {
-        fetchData();
-    };
 
     const handleDeleteCategory = async (categoryId) => {
         try {
@@ -118,7 +105,7 @@ function AdminCategoryManagePage() {
             key: "name",
             sorter: (a, b) => a.name?.localeCompare(b.name),
             render: (text, record) => (
-                <Link to={`/admin/category/${record.id}`} style={{ fontWeight: 500 }}>
+                <Link to={`/admin/category/${record.id}`} className="font-semibold text-brand-600 hover:text-brand-700 transition-colors">
                     {text}
                 </Link>
             ),
@@ -135,7 +122,7 @@ function AdminCategoryManagePage() {
             dataIndex: "description",
             key: "description",
             ellipsis: true,
-            render: (text) => text || "-",
+            render: (text) => <span className="text-slate-500">{text || "-"}</span>,
         },
         {
             title: "Children",
@@ -143,8 +130,8 @@ function AdminCategoryManagePage() {
             width: 100,
             render: (_, record) => {
                 const count = Array.isArray(record.children) ? record.children.length : 0;
-                if (count === 0) return <Tag>-</Tag>;
-                return <Tag color="blue">{count}</Tag>;
+                if (count === 0) return <span className="text-slate-400">-</span>;
+                return <Tag color="blue" className="rounded-lg px-2 border-transparent bg-blue-50 text-blue-600 font-semibold">{count}</Tag>;
             },
         },
         {
@@ -153,74 +140,68 @@ function AdminCategoryManagePage() {
             width: 200,
             render: (_, record) => (
                 <Space>
-                    <Button
-                        type="primary"
-                        icon={<PrefixIcon><i className="fi fi-rr-edit"></i></PrefixIcon>}
-                        size="small"
+                    <ActionButton
+                        variant="secondary"
+                        icon="fi fi-rr-edit"
+                        label="Edit"
                         onClick={() => handleEdit(record)}
-                    >
-                        Edit
-                    </Button>
+                    />
                     <Popconfirm
                         title="Delete category"
-                        description={`Are you sure you want to delete "${record.name}"? This action cannot be undone.`}
+                        description={`Are you sure you want to delete "${record.name}"?`}
                         onConfirm={() => handleDeleteCategory(record.id)}
                         okText="Yes"
                         cancelText="No"
                         okButtonProps={{ danger: true }}
                     >
-                        <Button
+                        <ActionButton
+                            variant="secondary"
                             danger
-                            icon={<PrefixIcon><i className="fi fi-rr-trash"></i></PrefixIcon>}
-                            size="small"
-                        >
-                            Delete
-                        </Button>
+                            icon="fi fi-rr-trash"
+                            label="Delete"
+                            onClick={() => {}} // Popconfirm handles click
+                        />
                     </Popconfirm>
                 </Space>
             ),
         },
     ];
 
+    const actions = (
+        <>
+            <Input
+                placeholder="Search categories..."
+                prefix={<i className="fi fi-rr-search text-slate-400"></i>}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="rounded-xl border-slate-200 hover:border-brand-400 focus:border-brand-500 w-64 text-sm"
+                allowClear
+            />
+            <ActionButton
+                variant="secondary"
+                icon="fi fi-rr-refresh"
+                label="Refresh"
+                onClick={fetchData}
+            />
+            <ActionButton
+                variant="primary"
+                icon="fi fi-rr-plus"
+                label="Add Root Category"
+                onClick={() => setAddModalVisible(true)}
+            />
+        </>
+    );
+
     return (
-        <Card
-            title={
-                <Row justify="space-between" align="middle">
-                    <Col>
-                        <span style={{ fontSize: "20px", fontWeight: 500 }}>
-                            Category Management
-                        </span>
-                    </Col>
-                    <Col>
-                        <Space>
-                            <Input
-                                placeholder="Search categories..."
-                                prefix={<PrefixIcon><i className="fi fi-rr-search"></i></PrefixIcon>}
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                style={{ width: 250 }}
-                                allowClear
-                            />
-                            <Button
-                                icon={<PrefixIcon><i className="fi fi-rr-refresh"></i></PrefixIcon>}
-                                onClick={fetchData}
-                            >
-                                Refresh
-                            </Button>
-                            <Button
-                                type="primary"
-                                icon={<PrefixIcon><i className="fi fi-rr-plus"></i></PrefixIcon>}
-                                onClick={() => setAddModalVisible(true)}
-                            >
-                                Add Root Category
-                            </Button>
-                        </Space>
-                    </Col>
-                </Row>
-            }
-        >
-            <div className={styles.categoryTable}>
-                <Table
+        <AdminLayout>
+            <PageHeader 
+                title="Category Management" 
+                subtitle="Organize product categories and hierarchy" 
+                actions={actions} 
+            />
+
+            <CardContainer>
+                <DataTable
                     columns={columns}
                     dataSource={filteredCategories}
                     rowKey="id"
@@ -230,25 +211,19 @@ function AdminCategoryManagePage() {
                         showSizeChanger: true,
                         showTotal: (total) => `Total ${total} categories`,
                     }}
-                    bordered
                     childrenColumnName="children"
                     expandable={{
                         defaultExpandAllRows: false,
                         expandRowByClick: false,
                         indentSize: 24,
                     }}
-                    onRow={() => ({
-                        style: {
-                            transition: "all 0.25s ease-in-out",
-                        },
-                    })}
                 />
-            </div>
+            </CardContainer>
 
             <CategoryAddRootModal
                 state={addModalVisible}
                 setState={setAddModalVisible}
-                onAdd={handleAddCategory}
+                onAdd={fetchData}
             />
 
             {selectedCategory && (
@@ -256,10 +231,10 @@ function AdminCategoryManagePage() {
                     state={editModalVisible}
                     setState={setEditModalVisible}
                     category={selectedCategory}
-                    onUpdate={handleEditCategory}
+                    onUpdate={fetchData}
                 />
             )}
-        </Card>
+        </AdminLayout>
     );
 }
 

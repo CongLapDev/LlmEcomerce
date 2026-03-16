@@ -34,13 +34,13 @@ const LogoutContainer = styled.div`
 function Sidebar({ ...props }) {
     const [state, user, hasRole] = useAuth();
     const location = useLocation();
-    
+
     // CRITICAL: Memoize menu items to prevent re-creation on every render
     // Only recalculate when auth state or user changes
     const menuItems = useMemo(() => {
         // CRITICAL: Don't compute roles when loading - return disabled items
         const isAdmin = state === 1 ? hasRole("ADMIN") : null;
-        
+
         const items = [
             {
                 key: "/admin",
@@ -76,26 +76,26 @@ function Sidebar({ ...props }) {
                 disabled: isAdmin === false, // Only disable if explicitly false (not null/true)
             },
         ];
-        
+
         return items;
     }, [state, hasRole]);
-    
+
     return (
         <SidebarWrapper>
             <MenuWrapper>
-                <StyledMenu 
+                <StyledMenu
                     items={menuItems}
                     selectedKeys={[location.pathname]}
                 />
                 {/* Logout button placed after User Management, but stays at bottom via flexbox */}
                 <LogoutContainer>
                     <Logout trigger={
-                        <Button 
-                            icon={<PrefixIcon><i className="fi fi-rs-sign-out-alt"></i></PrefixIcon>} 
-                            type="primary" 
-                            danger 
+                        <Button
+                            icon={<PrefixIcon><i className="fi fi-rs-sign-out-alt"></i></PrefixIcon>}
+                            type="primary"
+                            danger
                             block
-                            style={{ 
+                            style={{
                                 backgroundColor: "#ff4d4f",
                                 borderColor: "#ff4d4f"
                             }}

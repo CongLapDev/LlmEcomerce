@@ -1,22 +1,31 @@
+/* Google Fonts — Fira Code (headings) + Fira Sans (body) */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Flaticon UIcons */
 @import "~@flaticon/flaticon-uicons/css/all/all";
 
-*{
-  --primary-color-800:rgba(70, 70, 124, 0.855);
-  --primary-color-600:rgba(68, 68, 129, 0.436);
-  --primary-color-400:#9DB2BF;
-  --primary-color-200:#DDE6ED;
-  --primary-color-100:#edf3f8;
-  --text-dark:#2C3333;
-  --text-dark-200:#49545a;
-  --text-dark-400:#373c3f;
-  --text-light:white;
-  --sub-color-800:#223c43;
-  --sub-color-700:#304a51;
-  --sub-color-600:#395B64;
-  --sub-color-400:#41707c;
-  --light-color-1:#512eff;
-  --danger-color:#ff0000bf;
-  --base-radius:0.5rem;
+/* Tailwind CSS v3 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  --primary-color-800: rgba(70, 70, 124, 0.855);
+  --primary-color-600: rgba(68, 68, 129, 0.436);
+  --primary-color-400: #9DB2BF;
+  --primary-color-200: #DDE6ED;
+  --primary-color-100: #edf3f8;
+  --text-dark: #2C3333;
+  --text-dark-200: #49545a;
+  --text-dark-400: #373c3f;
+  --text-light: white;
+  --sub-color-800: #223c43;
+  --sub-color-700: #304a51;
+  --sub-color-600: #395B64;
+  --sub-color-400: #41707c;
+  --light-color-1: #512eff;
+  --danger-color: #ff0000bf;
+  --base-radius: 0.5rem;
 }
 
 body {
@@ -28,57 +37,69 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #edf1f4 !important;
 }
-a{
-  color:inherit !important;
+
+a {
+  color: inherit !important;
   text-decoration: inherit !important;
-  font:inherit !important;
+  font: inherit !important;
 }
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
-label{
+
+label {
   width: 100%;
   text-align: left;
   font-size: small;
 }
-.btn .icon{
+
+.btn .icon {
   margin-right: 8px;
 }
-.list-item{
 
+.list-item {}
+
+[data-justify-col-end] {
+  margin-left: attr(data-justify-col-end);
 }
-[data-justify-col-end]{
-  margin-left:attr(data-justify-col-end);
+
+.inherit-link {
+  text-decoration: inherit;
+  font-size: inherit;
+  color: inherit;
 }
-.inherit-link{
-    text-decoration: inherit;
-    font-size: inherit;
-    color: inherit;
+
+.inherit-link:hover {
+  color: var(--primary-color-800);
+  text-decoration: underline;
 }
-.inherit-link:hover{
-    color: var(--primary-color-800);
-    text-decoration:underline;
-}
-.border-primary-600{
+
+.border-primary-600 {
   border-color: var(--primary-color-600);
 }
-.border-primary-800{
+
+.border-primary-800 {
   border-color: var(--primary-color-800);
 }
-.card{
+
+.card {
   border: none !important;
   box-shadow: #7c73c027 0px 0px 16px;
   border-radius: 0.8rem;
 }
-.description{
-  color: var( --primary-color-600)
+
+.description {
+  color: var(--primary-color-600)
 }
+
 @media (max-width:512px) {
-  .col-xs-0{
+  .col-xs-0 {
     display: none;
   }
-  .h-xs-full{
+
+  .h-xs-full {
     height: 100%;
   }
 }

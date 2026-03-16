@@ -24,6 +24,7 @@
     "react-redux": "^9.1.1",
     "react-router-dom": "^6.22.3",
     "react-scripts": "5.0.1",
+    "recharts": "^3.8.0",
     "redux": "^5.0.1",
     "styled-components": "^6.1.11",
     "web-vitals": "^2.1.4",
@@ -54,6 +55,10 @@
     ]
   },
   "devDependencies": {
-    "sass": "^1.72.0"
+    "@tailwindcss/postcss": "^4.2.1",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "sass": "^1.72.0",
+    "tailwindcss": "^3.4.19"
   }
 }

@@ -203,7 +203,8 @@ APIBase.interceptors.request.use(
     },
     (error) => {
         console.error("[ApiBase] Request interceptor error handler:", error);
-        return Promise.reject(error);
+        // Ensure we always reject with an Error object to prevent "Unknown promise rejection reason"
+        return Promise.reject(error instanceof Error ? error : new Error(String(error) || "Unknown Request Error"));
     }
 );
 
@@ -325,7 +326,8 @@ APIBase.interceptors.response.use(
             console.error("[ApiBase] Server Error (5xx) - backend issue");
         }
 
-        return Promise.reject(error);
+        // Ensure we always reject with an Error object to prevent "Unknown promise rejection reason"
+        return Promise.reject(error instanceof Error ? error : new Error(error?.message || String(error) || "Unknown Response Error"));
     }
 );
 

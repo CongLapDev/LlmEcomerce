@@ -1,316 +1,265 @@
-import { Row, Col, Card, Avatar, Button, Flex, Statistic, DatePicker, Space } from "antd";
-import style from './style.module.scss';
-import { useEffect, useMemo, useRef, useState } from "react";
-import APIBase, { getImageUrl } from "../../../api/ApiBase";
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, ArcElement, Title } from "chart.js";
-import { Line, Pie, getElementAtEvent } from "react-chartjs-2";
-import { Link } from "react-router-dom";
-import { Description } from "../../../components";
-import useAuth from "../../../secure/useAuth";
-import AccountStatusTag from "../../../part/account-status-tag/AccountStatusTag";
-import PlaceHolder from "../../../assets/image/product_placeholder.png";
-const { Meta } = Card;
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, ArcElement, Title);
+import { useState, useEffect, useCallback } from "react";
+import Sidebar from "../../../components/layout/Sidebar";
+import Navbar from "../../../components/layout/Navbar";
+import KPIStats from "../../../components/dashboard/KPIStats";
+import SalesChart from "../../../components/dashboard/SalesChart";
+import UserGrowthChart from "../../../components/dashboard/UserGrowthChart";
+import RevenueByCategory from "../../../components/dashboard/RevenueByCategory";
+import TopProducts from "../../../components/dashboard/TopProducts";
+import TopCustomers from "../../../components/dashboard/TopCustomers";
+import RecentOrdersTable from "../../../components/dashboard/RecentOrdersTable";
+import LowStockAlert from "../../../components/dashboard/LowStockAlert";
+import ActivityFeed from "../../../components/dashboard/ActivityFeed";
+import {
+    getDashboardStats,
+    getSalesChart,
+    getUserGrowth,
+    getRevenueByCategory,
+    getTopProducts,
+    getTopCustomers,
+    getRecentOrders,
+    getLowStockProducts,
+} from "../../../services/dashboardService";
 
+// ── Loading skeleton card ────────────────────────────────────────────────────
+function SkeletonCard({ className = "" }) {
+    return (
+        <div className={`bg-white rounded-xl shadow-sm border border-slate-100 p-5 animate-pulse ${className}`}>
+            <div className="h-3 w-1/3 bg-slate-200 rounded mb-3" />
+            <div className="h-7 w-1/2 bg-slate-200 rounded mb-2" />
+            <div className="h-2.5 w-1/4 bg-slate-100 rounded" />
+        </div>
+    );
+}
+
+function SkeletonChart({ className = "", height = "h-52" }) {
+    return (
+        <div className={`bg-white rounded-xl shadow-sm border border-slate-100 p-5 animate-pulse ${className}`}>
+            <div className="h-3 w-1/4 bg-slate-200 rounded mb-5" />
+            <div className={`${height} bg-slate-100 rounded-lg`} />
+        </div>
+    );
+}
+
+// ── Error banner ──────────────────────────────────────────────────────────────
+function ErrorBanner({ message, onRetry }) {
+    return (
+        <div className="flex items-center justify-between p-4 bg-red-50 border border-red-100 rounded-xl text-sm">
+            <div className="flex items-center gap-2 text-red-700">
+                <i className="fi fi-rr-triangle-warning text-base leading-none" />
+                <span className="font-body">{message}</span>
+            </div>
+            {onRetry && (
+                <button
+                    onClick={onRetry}
+                    className="text-xs font-semibold text-red-600 hover:text-red-700 underline cursor-pointer font-body"
+                >
+                    Retry
+                </button>
+            )}
+        </div>
+    );
+}
+
+// ── Main Dashboard Page ───────────────────────────────────────────────────────
 function AdminDashboardPage() {
-    const [state, user] = useAuth();
-    const [orderStatistics, setOrderStatistics] = useState(undefined);
-    const [userStatistic, setUserStatistic] = useState(undefined);
-    const chartRef = useRef();
-    const [chartIdx, setChartIdx] = useState(0);
-    const [prospectiveUser, setProspectiveUser] = useState();
-    const [overview, setOverView] = useState(undefined);
+    const [collapsed, setCollapsed] = useState(false);
 
-    const totalOrders30days = useMemo(() => {
-        var date = new Date();
-        date.setDate(1)
-        return orderStatistics ? orderStatistics.reduce((pre, item_) => {
-            if ((new Date(item_.date) - date) / (1000 * 60 * 60 * 24) >= 0) {
-                return pre + item_.number_orders_day;
-            }
-        }, 0) : 0;
-    }, [orderStatistics])
-    function fetchOrderPerDayStatistic([from, to]) {
-        console.log(from, to)
-        var params = new URLSearchParams({
-            from: from || (() => {
-                var date = new Date()
-                date.setDate(date.getDate() - 30)
-                return date;
-            })().toISOString().split("T")[0],
-            to: to || new Date().toISOString().split("T")[0]
-        });
+    // ── State ──
+    const [kpi, setKpi] = useState({
+        totalRevenue: 0,
+        revenueGrowth: 0,
+        ordersToday: 0,
+        ordersGrowth: 0,
+        totalProducts: 0,
+        productsGrowth: 0,
+        totalUsers: 0,
+        usersGrowth: 0,
+    });
+    const [sales, setSales] = useState([]);
+    const [userGrowth, setUserGrowth] = useState([]);
+    const [revenueByCategory, setRevenueByCategory] = useState([]);
+    const [topProducts, setTopProducts] = useState([]);
+    const [topCustomers, setTopCustomers] = useState([]);
+    const [recentOrders, setRecentOrders] = useState([]);
+    const [lowStock, setLowStock] = useState([]);
 
-        APIBase.get(`/api/v1/statistic/day/order?${params.toString()}`)
-            .then(payload => {
-                setOrderStatistics(payload.data);
-                return payload.data;
-            })
-            .catch(console.error)
-    }
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // ── Fetch all dashboard data in parallel ──────────────────────────────────
+    const fetchAll = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [
+                kpiData,
+                salesData,
+                userGrowthData,
+                revByCatData,
+                topProductsData,
+                topCustomersData,
+                recentOrdersData,
+                lowStockData,
+            ] = await Promise.all([
+                getDashboardStats(),
+                getSalesChart(),
+                getUserGrowth(),
+                getRevenueByCategory(),
+                getTopProducts({ limit: 5 }),
+                getTopCustomers({ limit: 5 }),
+                getRecentOrders({ limit: 10 }),
+                getLowStockProducts(),
+            ]);
+
+            setKpi(kpiData);
+            setSales(salesData);
+            setUserGrowth(userGrowthData);
+            setRevenueByCategory(revByCatData);
+            setTopProducts(topProductsData);
+            setTopCustomers(topCustomersData);
+            setRecentOrders(recentOrdersData);
+            setLowStock(lowStockData);
+        } catch (err) {
+            console.error("[Dashboard] Failed to load dashboard data:", err);
+            setError(
+                err?.response?.data?.message ||
+                err?.message ||
+                "Failed to load dashboard data. Please try again."
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
-        fetchOrderPerDayStatistic([])
-        APIBase.get("/api/v1/statistic/user").then(payload => {
-            setUserStatistic(payload.data);
-        }).catch(console.error)
-        APIBase.get("/api/v1/statistic/user/prospective").then(payload => payload.data).then(setProspectiveUser).catch(console.error)
-        APIBase.get("/api/v1/statistic").then(payload => payload.data).then(setOverView).catch(console.error)
-    }, [])
-    const randomNum = () => Math.floor(Math.random() * (235 - 52 + 1) + 52);
-    const randomRGB = () => `rgb(${randomNum()}, ${randomNum()}, ${randomNum()})`;
-    return (<Row style={{ padding: "16px" }} gutter={[16, 16]} align="stretch">
-        <Col span={12}>
-            <Card>
-                <Row justify="center" align="center">
-                    <Col className={style.overview} span={8}>
-                        <Description>Users</Description>
-                        <h3>{overview && overview.number_of_users}</h3>
-                    </Col>
-                    <Col className={style.overview} span={8}>
-                        <Description>Products</Description>
-                        <h3>{overview && overview.number_of_products}</h3>
-                    </Col>
-                    <Col className={style.overview} span={8}>
-                        <Description>Warehouses</Description>
-                        <h3>{overview && overview.number_of_warehouse}</h3>
-                    </Col>
-                    <Col className={style.overview} span={8}>
-                        <Description>Categories</Description>
-                        <h3>{overview && overview.number_of_category}</h3>
-                    </Col>
-                    <Col className={style.overview} span={8}>
-                        <Description>Payment methods</Description>
-                        <h3>{overview && overview.available_payment_method}</h3>
-                    </Col>
-                    <Col className={style.overview} span={8}>
-                        <Description>Revenue</Description>
-                        <h3>{overview && overview.revenue}</h3>
-                    </Col>
-                </Row>
-            </Card>
-        </Col>
-        <Col span={6}>
-            <Card style={{ height: "100%" }} actions={[
-                <Col className={style.statistic}>
-                    <Description>Active</Description>
-                    <h3>{userStatistic && userStatistic.totalStatus1}</h3>
-                </Col>,
-                <Col className={style.statistic}>
-                    <Description>Inactive</Description>
-                    <h3>{userStatistic && userStatistic.totalStatus2}</h3>
-                </Col>,
-                <Col className={style.statistic}>
-                    <Description>Lock</Description>
-                    <h3>{userStatistic && userStatistic.totalStatus3}</h3>
-                </Col>
-            ]}>
-                <Statistic title="Users" value={userStatistic && userStatistic.totalAccounts} />
-            </Card>
-        </Col>
-        <Col span={6}>
-            <Card
-                style={{ height: "100%" }}
-                actions={[
-                    <Col className={style.statistic}>
-                        <Description>Role</Description>
-                        <h5>{user && user.account.roles.map(role_ => role_.name).join(' ')}</h5>
-                    </Col>,
-                    <Col className={style.statistic}>
-                        <Description>Status</Description>
-                        <h5> {user && <AccountStatusTag status={user.account.status} />}</h5>
+        fetchAll();
+    }, [fetchAll]);
 
+    // ── Refresh sales chart for a custom date range ───────────────────────────
+    const handleSalesRangeChange = useCallback(async (from, to) => {
+        try {
+            const data = await getSalesChart({ from, to });
+            setSales(data);
+        } catch (err) {
+            console.error("[Dashboard] Failed to reload sales chart:", err);
+        }
+    }, []);
 
-                    </Col>,
-                    <Col className={style.statistic}>
-                        <Description>More Detail</Description>
-                        <h3></h3>
-                    </Col>
-                ]}
+    const today = new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+
+    const sidebarWidth = collapsed ? 68 : 240;
+
+    return (
+        <div className="min-h-screen bg-slate-50 font-body">
+            {/* Sidebar */}
+            <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((s) => !s)} />
+
+            {/* Navbar */}
+            <Navbar collapsed={collapsed} />
+
+            {/* Main content */}
+            <main
+                className="transition-all duration-300 pt-16"
+                style={{ marginLeft: sidebarWidth }}
             >
+                <div className="p-6 space-y-6">
 
-                <Card.Meta
-                    avatar={<Avatar src={user.picture} />}
-                    title={user.lastname + " " + user.firstname} />
-                <div style={{ paddingTop: "1rem" }}>
-                    <Description>{user.email}</Description>
+                    {/* Page header */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-xl font-bold font-heading text-slate-800 tracking-tight">
+                                Dashboard
+                            </h1>
+                            <p className="text-xs text-slate-400 font-body mt-0.5">{today}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={fetchAll}
+                                disabled={loading}
+                                className="flex items-center gap-2 text-xs font-medium text-slate-600 border border-slate-200 bg-white hover:border-brand-500 hover:text-brand-600 px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer shadow-sm disabled:opacity-50"
+                            >
+                                <i className={`fi fi-rr-refresh text-xs leading-none ${loading ? "animate-spin" : ""}`} />
+                                <span>Refresh</span>
+                            </button>
+                            <button className="flex items-center gap-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer shadow-sm shadow-brand-600/20">
+                                <i className="fi fi-rr-download text-xs leading-none" />
+                                <span>Export</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Error banner */}
+                    {error && <ErrorBanner message={error} onRetry={fetchAll} />}
+
+                    {/* ── KPI Cards ── */}
+                    {loading ? (
+                        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                            {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+                        </div>
+                    ) : (
+                        <KPIStats data={kpi} />
+                    )}
+
+                    {/* ── Sales + User Growth ── */}
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                        <div className="xl:col-span-2">
+                            {loading
+                                ? <SkeletonChart height="h-52" />
+                                : <SalesChart data={sales} onRangeChange={handleSalesRangeChange} />
+                            }
+                        </div>
+                        {loading
+                            ? <SkeletonChart />
+                            : <UserGrowthChart data={userGrowth} />
+                        }
+                    </div>
+
+                    {/* ── Top Products + Top Customers + Revenue by Category ── */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        {loading ? (
+                            <>
+                                <SkeletonChart height="h-48" />
+                                <SkeletonChart height="h-48" />
+                                <SkeletonChart height="h-48" />
+                            </>
+                        ) : (
+                            <>
+                                <TopProducts data={topProducts} />
+                                <TopCustomers data={topCustomers} />
+                                <RevenueByCategory data={revenueByCategory} />
+                            </>
+                        )}
+                    </div>
+
+                    {/* ── Low Stock + Activity Feed ── */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        <div className="lg:col-span-1">
+                            {loading
+                                ? <SkeletonChart height="h-64" />
+                                : <LowStockAlert data={lowStock} />
+                            }
+                        </div>
+                        <div className="lg:col-span-2">
+                            {/* Activity feed: static or from a separate API */}
+                            <ActivityFeed data={[]} />
+                        </div>
+                    </div>
+
+                    {/* ── Recent Orders (full width) ── */}
+                    {loading
+                        ? <SkeletonChart height="h-48" className="w-full" />
+                        : <RecentOrdersTable data={recentOrders} />
+                    }
                 </div>
-            </Card>
-        </Col>
-        <Col span={16}>
-            <Card title={<Row justify="space-between">
-                <span>Orders</span>
-                <Space>
-                    <DatePicker.RangePicker picker="date" onChange={(from, to) => fetchOrderPerDayStatistic(to)} />
-                </Space>
-            </Row>}>
-                <div className={style.orderStatisticsChart}>
-                    {orderStatistics && <Line
-                        ref={chartRef}
-                        datasetIdKey='id'
-                        data={{
-                            labels: orderStatistics.map(item_ => item_.date),
-                            datasets: [
-                                {
-                                    id: 1,
-                                    borderColor: "#a52a36",
-                                    backgroundColor: "#a52a36",
-                                    data: orderStatistics.map(item_ => item_.number_orders_day)
-                                }
-                            ]
-                        }}
-                        onClick={(e) => {
-                            console.log(e)
-                            if (getElementAtEvent(chartRef.current, e)[0]) {
-                                setChartIdx(getElementAtEvent(chartRef.current, e)[0].index);
-                            }
-                        }}
-                        options={{
-                            plugins: {
-                                tooltip: {
-                                    usePointStyle: true,
-                                    callbacks: {
-                                        beforeTitle: function (context) {
-                                            return "Title"
-                                        }
-                                    }
-                                }
-                            }
-                        }}
-                    />}
-                </div>
-
-            </Card>
-        </Col>
-        <Col span={8}>
-            <Row gutter={[16, 16]}>
-                <Col span={24}>
-                    <Card>
-                        <Statistic title="Number of Orders" value={orderStatistics && orderStatistics.reduce((pre, orderPerDays_) => pre + orderPerDays_.number_orders_day, 0)} />
-                    </Card>
-                </Col>
-                <Col span={24}>
-                    <Card title="Customer" className={style.ubiquitousPd}>
-                        <Col span={24}>
-                            {orderStatistics && orderStatistics.length > 0 && orderStatistics[chartIdx].products.map((item_, index) => <Row className={style.product} key={index}>
-                                <Col span={6}>
-                                    <img 
-                                        src={getImageUrl(item_.product.picture) || PlaceHolder} 
-                                        alt={item_.product.name || "Product"}
-                                        style={{ width: "100%", height: "auto", objectFit: "contain" }}
-                                    />
-                                </Col>
-                                <Col span={18}>
-                                    <Row><Link to={`/admin/product?id=${item_.product.id}`}>{item_.product.name}</Link></Row>
-                                    <Row>{item_.qty}</Row>
-                                </Col>
-                            </Row>)}
-                        </Col>
-                    </Card>
-                </Col>
-            </Row>
-        </Col>
-        <Col span={6}>
-            <Card>
-                {orderStatistics && <Row justify="center">
-                    {(() => {
-                        const data = orderStatistics.reduce((pre, item_) => {
-                            for (let product of item_.products) {
-                                let category = pre.find(category_ => category_.id == product.product.category.id);
-                                if (!category) {
-                                    pre.push(product.product.category)
-                                    pre[pre.length - 1].qty = product.qty;
-                                } else {
-                                    category.qty = category.qty + product.qty;
-                                }
-                            }
-                            return pre;
-                        }, [])
-                        return <Pie
-                            options={{
-                                plugins: {
-                                    title: {
-                                        display: true,
-                                        text: "% of brands"
-                                    }
-                                }
-                            }}
-                            data={{
-                                labels: data.map(category_ => category_.name + "/" + category_.parent?.name),
-                                datasets: [{
-                                    label: "% of brands",
-                                    data: data.map(category_ => category_.qty),
-                                    backgroundColor: data.map(category_ => randomRGB())
-                                }]
-                            }} />;
-                    })()}
-                </Row>}
-            </Card>
-        </Col>
-        <Col span={6}>
-            <Card>
-                {orderStatistics && <Row justify="center">
-                    {(() => {
-                        const data = orderStatistics.reduce((pre, item_) => {
-                            for (let product of item_.products) {
-                                let category = pre.find(category_ => category_.id == product.product.category.parent.id);
-                                if (!category) {
-                                    pre.push(product.product.category.parent)
-                                    pre[pre.length - 1].qty = product.qty;
-                                } else {
-                                    category.qty = category.qty + product.qty;
-                                }
-                            }
-                            return pre;
-                        }, [])
-                        return <Pie
-                            options={{
-                                plugins: {
-                                    title: {
-                                        display: true,
-                                        text: "% of categories"
-                                    }
-                                }
-                            }}
-                            data={{
-                                labels: data.map(category_ => category_.name),
-                                datasets: [{
-                                    label: "% of categories",
-                                    data: data.map(category_ => category_.qty),
-                                    backgroundColor: data.map(category_ => randomRGB())
-                                }]
-                            }} />;
-                    })()}
-                </Row>}
-            </Card>
-        </Col>
-        <Col span={12}>
-            <Card title="Prospective customers">
-                <Row gutter={12}>
-                    {prospectiveUser && prospectiveUser.map((user_, index) => <Col span={12}>
-                        <Card
-                            key={index}
-                            actions={[
-                                <Link to={`/admin/user?id=${user_.id}`}><Button type="link">Details</Button></Link>
-                            ]}
-                        >
-                            <Meta
-
-                                description={
-                                    <>
-                                        <Row><span>Total Orders:{user_.totalOrders}</span></Row>
-                                        <Row><span>Total Amount: {user_.totalAmount}</span></Row>
-                                    </>
-                                }
-                                avatar={<Avatar src={user_.picture} />}
-                                title={user_.firstname + " " + user_.lastname}
-                            />
-                        </Card>
-                    </Col>)}
-                </Row>
-            </Card>
-        </Col>
-
-    </Row>);
+            </main>
+        </div>
+    );
 }
 
 export default AdminDashboardPage;
