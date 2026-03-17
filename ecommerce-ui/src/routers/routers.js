@@ -1,4 +1,3 @@
-import SidebarLayout from "../layout/admin/sidebar-layout/SideBarLayout.js";
 import HeadOnly from "../layout/headOnly/HeadOnly.js";
 import LoginPage from "../page/Login/LoginPage.js";
 import Home from "../page/user/home/Home.js";
@@ -50,51 +49,51 @@ export const userRouter = [
 ];
 export const adminRouter = [
     // /admin route must be FIRST in adminRouter to ensure it's matched before other admin routes
-    { path: "/admin", component: AdminDashboardPage, layout: SidebarLayout },
-    { path: "/admin/order-manage", component: AdminOrderManagePage, layout: SidebarLayout },
+    { path: "/admin", component: AdminDashboardPage, layout: null },
+    { path: "/admin/order-manage", component: AdminOrderManagePage, layout: null },
     {
         path: "/admin/order",
         component: AdminOrderDetailPage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/product-manage",
         component: AdminProductManagePage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/product",
         component: ProductDetailPage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/category",
         component: AdminCategoryManagePage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/category/:id",
         component: AdminCategoryDetailPage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/warehouse",
         component: AdminWarehouseManagePage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/warehouse/detail",
         component: AdminWareHouseDetailPage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/user/manage",
         component: AdminUserManagePage,
-        layout: SidebarLayout,
+        layout: null,
     },
     {
         path: "/admin/user",
         component: AdminUserDetailPage,
-        layout: SidebarLayout,
+        layout: null,
     },
 ];

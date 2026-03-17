@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import Sidebar from "../../../components/layout/Sidebar";
-import Navbar from "../../../components/layout/Navbar";
+import AdminLayout from "../../../components/layout/AdminLayout";
 import KPIStats from "../../../components/dashboard/KPIStats";
 import SalesChart from "../../../components/dashboard/SalesChart";
 import UserGrowthChart from "../../../components/dashboard/UserGrowthChart";
@@ -63,7 +62,6 @@ function ErrorBanner({ message, onRetry }) {
 
 // ── Main Dashboard Page ───────────────────────────────────────────────────────
 function AdminDashboardPage() {
-    const [collapsed, setCollapsed] = useState(false);
 
     // ── State ──
     const [kpi, setKpi] = useState({
@@ -153,24 +151,9 @@ function AdminDashboardPage() {
         day: "numeric",
     });
 
-    const sidebarWidth = collapsed ? 68 : 240;
-
     return (
-        <div className="min-h-screen bg-slate-50 font-body">
-            {/* Sidebar */}
-            <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((s) => !s)} />
-
-            {/* Navbar */}
-            <Navbar collapsed={collapsed} />
-
-            {/* Main content */}
-            <main
-                className="transition-all duration-300 pt-16"
-                style={{ marginLeft: sidebarWidth }}
-            >
-                <div className="p-6 space-y-6">
-
-                    {/* Page header */}
+        <AdminLayout>
+            {/* Page header */}
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-xl font-bold font-heading text-slate-800 tracking-tight">
@@ -256,9 +239,7 @@ function AdminDashboardPage() {
                         ? <SkeletonChart height="h-48" className="w-full" />
                         : <RecentOrdersTable data={recentOrders} />
                     }
-                </div>
-            </main>
-        </div>
+        </AdminLayout>
     );
 }
 

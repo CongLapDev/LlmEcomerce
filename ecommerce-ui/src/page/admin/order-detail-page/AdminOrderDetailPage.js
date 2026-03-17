@@ -14,6 +14,9 @@ import PlaceHolder from "../../../assets/image/product_placeholder.png";
 import { Currency, Description } from "../../../components";
 import OrderStatusTag from "../../../part/admin/order-status-tag/OrderStatusTag";
 import { formatDateTime } from "../../../utils/dateFormatter";
+import AdminLayout from "../../../components/layout/AdminLayout";
+import PageHeader from "../../../components/ui/PageHeader";
+import CardContainer from "../../../components/ui/CardContainer";
 import { 
     getCurrentStatus, 
     getStatusLabel, 
@@ -438,7 +441,11 @@ function AdminOrderDetailPage() {
         });
 
         return (
-            <Card style={{ marginBottom: 16 }}>
+            <CardContainer className="mb-6">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                    <h3 className="font-heading font-semibold text-slate-700 text-sm">Order Progress</h3>
+                </div>
+                <div className="p-6 overflow-x-auto">
                 <Steps
                     current={currentStep}
                     status={currentStatusId === 7 ? 'finish' : 'process'}
@@ -446,8 +453,10 @@ function AdminOrderDetailPage() {
                         title: step.title,
                         description: index === currentStep ? '← Current step' : null
                     }))}
+                        className="min-w-[600px]"
                 />
-            </Card>
+                </div>
+            </CardContainer>
         );
     };
 
@@ -460,7 +469,7 @@ function AdminOrderDetailPage() {
     const currentStatus = getCurrentStatus(data);
 
     return (
-        <>
+        <AdminLayout>
             {/* Cancel Order Modal */}
             <Modal
                 title="Cancel Order"
@@ -497,30 +506,27 @@ function AdminOrderDetailPage() {
             </Modal>
 
             {/* Main Content */}
-            <Row style={{ padding: "16px" }} gutter={[16, 16]}>
-                <Col span={24}>
-                    <Card>
-                        <Row justify="space-between" align="middle">
-                            <Col>
-                                <h2 style={{ margin: 0 }}>Order #{data.id}</h2>
-                            </Col>
-                            <Col>
-                                <OrderStatusTag status={currentStatus?.status} />
-                            </Col>
-                        </Row>
-                    </Card>
-                </Col>
+            <PageHeader
+                title={`Order #${data.id}`}
+                subtitle="View and manage order details"
+                actions={<OrderStatusTag status={currentStatus?.status} />}
+            />
 
-                {/* Timeline */}
-                <Col span={24}>
+            <div className="flex flex-col gap-6">
+                
+                {/* Timeline - Full Width */}
+                <div className="w-full">
                     {renderTimeline()}
-                </Col>
-
-                {/* Customer Info */}
-                <Col xs={24} lg={6}>
-                    <Row gutter={[16, 16]}>
-                        <Col span={24}>
-                            <Card title="👤 Customer">
+                </div>
+                
+                <div className="flex flex-col lg:flex-row gap-6">
+                    {/* Customer Info */}
+                    <div className="w-full lg:w-1/4 flex flex-col gap-6">
+                        <CardContainer>
+                            <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                <h3 className="font-heading font-semibold text-slate-700 text-sm">👤 Customer</h3>
+                            </div>
+                            <div className="p-5">
                                 <Card.Meta
                                     avatar={<Avatar src={data.user.picture} />}
                                     title={`${data.user.firstname} ${data.user.lastname}`}
@@ -531,94 +537,105 @@ function AdminOrderDetailPage() {
                                         <strong>Phone:</strong> {data.user.phoneNumber}
                                     </p>
                                 )}
-                            </Card>
-                        </Col>
-                        <Col span={24}>
-                            <Card title="📍 Delivery Address">
-                                    <p>{data.address.city}</p>
-                                    <Description>{data.address.region}</Description>
-                                    <Description>{data.address.addressLine1}</Description>
-                            </Card>
-                        </Col>
-                    </Row>
-                </Col>
+                            </div>
+                        </CardContainer>
+                        
+                        <CardContainer>
+                            <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                <h3 className="font-heading font-semibold text-slate-700 text-sm">📍 Delivery Address</h3>
+                            </div>
+                            <div className="p-5">
+                                <p>{data.address.city}</p>
+                                <Description>{data.address.region}</Description>
+                                <Description>{data.address.addressLine1}</Description>
+                            </div>
+                        </CardContainer>
+                    </div>
 
-                {/* Order Details */}
-                <Col xs={24} lg={18}>
-                    <Row gutter={[16, 16]}>
-                        {/* Stats */}
-                        <Col span={24}>
-                            <Row gutter={[16, 16]}>
-                                <Col xs={24} md={12}>
-                                    <Card>
-                                        <Statistic title="📅 Order Date" value={formatDateTime(data.orderDate)} />
-                                    </Card>
-                                </Col>
-                                <Col xs={24} md={6}>
-                                    <Card>
-                                        <Statistic title="💰 Total" value={data.total} suffix="₫" />
-                                    </Card>
-                                </Col>
-                                <Col xs={24} md={6}>
-                                    <Card>
-                                        <Statistic
-                                            title="🚚 Shipping"
-                                            value={data.shippingMethod?.price || 0}
-                                            suffix="₫"
-                                        />
-                                    </Card>
-                                </Col>
-                            </Row>
-                        </Col>
+                    {/* Order Details & Sidebar */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex flex-col xl:flex-row gap-6">
+                            
+                            {/* Main Left Column (Stats & Products) */}
+                            <div className="flex-1 min-w-0 flex flex-col gap-6">
+                                
+                                {/* Stats */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <CardContainer>
+                                        <div className="p-5">
+                                            <Statistic title="📅 Order Date" value={formatDateTime(data.orderDate)} />
+                                        </div>
+                                    </CardContainer>
+                                    <CardContainer>
+                                        <div className="p-5">
+                                            <Statistic title="💰 Total" value={data.total} suffix="₫" />
+                                        </div>
+                                    </CardContainer>
+                                    <CardContainer>
+                                        <div className="p-5">
+                                            <Statistic
+                                                title="🚚 Shipping"
+                                                value={data.shippingMethod?.price || 0}
+                                                suffix="₫"
+                                            />
+                                        </div>
+                                    </CardContainer>
+                                </div>
 
-                        {/* Products & Actions */}
-                        <Col xs={24} lg={18}>
-                            <Card title="📦 Products">
-                                        {data.orderLines.map((item, index) => (
-                                    <div key={index}>
-                                        <Row gutter={[16, 16]} align="middle">
-                                            <Col xs={6} sm={4}>
-                                                <img
-                                                    style={{ width: "100%", height: "auto" }}
-                                                    src={getImageUrl(item.productItem.product.picture) || PlaceHolder}
-                                                    alt={item.productItem.product.name}
-                                                />
-                                            </Col>
-                                            <Col xs={18} sm={20}>
-                                                <h4>{item.productItem.product.name}</h4>
-                                                <Tag color="blue">
-                                                    {item.productItem.options.map(opt => opt.value).join(", ")}
-                                                </Tag>
-                                                <Row justify="space-between" style={{ marginTop: 8 }}>
-                                                    <Col>Quantity: {item.qty}</Col>
-                                                    <Col>
-                                                        <strong><Currency value={item.total} /></strong>
-                                                </Col>
-                                            </Row>
-                                            </Col>
-                                        </Row>
-                                        {index < data.orderLines.length - 1 && <Divider />}
+                                {/* Products */}
+                                <CardContainer>
+                                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                        <h3 className="font-heading font-semibold text-slate-700 text-sm">📦 Products</h3>
                                     </div>
-                                ))}
-                                        <Divider />
-                                <Row justify="end">
-                                    <h3>Total: <span style={{ color: '#52c41a' }}>
-                                        <Currency value={data.total} />
-                                    </span></h3>
-                                </Row>
-                            </Card>
-                        </Col>
+                                    <div className="p-5">
+                                        {data.orderLines.map((item, index) => (
+                                            <div key={index}>
+                                                <div className="flex items-center gap-4 py-4">
+                                                    <div className="w-16 h-16 flex-shrink-0 bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                                                        <img
+                                                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                                            src={getImageUrl(item.productItem.product.picture) || PlaceHolder}
+                                                            alt={item.productItem.product.name}
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="text-sm font-semibold text-slate-800 truncate mb-1">{item.productItem.product.name}</h4>
+                                                        <div className="flex gap-2 items-center mb-2">
+                                                            <Tag color="blue" className="rounded-md border-transparent mx-0">
+                                                                {item.productItem.options.map(opt => opt.value).join(", ")}
+                                                            </Tag>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mt-2">
+                                                            <span className="text-xs text-slate-500 font-medium">Quantity: {item.qty}</span>
+                                                            <strong className="text-brand-600 font-heading"><Currency value={item.total} /></strong>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {index < data.orderLines.length - 1 && <Divider className="my-2 border-slate-100" />}
+                                            </div>
+                                        ))}
+                                        <div className="mt-4 pt-4 border-t border-slate-200 flex justify-end">
+                                            <h3 className="text-base font-bold text-slate-800">Total: <span style={{ color: '#52c41a' }} className="font-heading ml-2 text-lg">
+                                                <Currency value={data.total} />
+                                            </span></h3>
+                                        </div>
+                                    </div>
+                                </CardContainer>
+                            </div>
 
-                        {/* Right Sidebar */}
-                        <Col xs={24} lg={6}>
-                            <Row gutter={[16, 16]}>
+                            {/* Right Sidebar */}
+                            <div className="w-full xl:w-80 flex-shrink-0 flex flex-col gap-6">
+                                
                                 {/* Payment Method */}
-                                <Col span={24}>
-                                    <Card title="💳 Payment">
-                                        <p><strong>Method:</strong></p>
-                                        <Tag color="gold">{data.payment?.type.name}</Tag>
-                                    </Card>
-                                </Col>
+                                <CardContainer>
+                                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                        <h3 className="font-heading font-semibold text-slate-700 text-sm">💳 Payment</h3>
+                                    </div>
+                                    <div className="p-5">
+                                        <p className="text-xs text-slate-500 font-medium mb-2">Method:</p>
+                                        <Tag color="gold" className="rounded-md mx-0">{data.payment?.type.name}</Tag>
+                                    </div>
+                                </CardContainer>
 
                                 {/* Tracking Number (if shipping) */}
                                 {(() => {
@@ -628,64 +645,76 @@ function AdminOrderDetailPage() {
                                         const trackingUrl = getTrackingUrl(shippingStatus.detail, validation.carrier);
                                         
                                         return (
-                                            <Col span={24}>
-                                                <Card title="🚚 Shipping">
-                                                    <p><strong>Tracking Number:</strong></p>
-                                                    <Tag color="purple">{shippingStatus.detail}</Tag>
+                                            <CardContainer>
+                                                <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                                    <h3 className="font-heading font-semibold text-slate-700 text-sm">🚚 Shipping</h3>
+                                                </div>
+                                                <div className="p-5">
+                                                    <p className="text-xs text-slate-500 font-medium mb-2">Tracking Number:</p>
+                                                    <Tag color="purple" className="rounded-md mx-0 text-sm py-0.5">{shippingStatus.detail}</Tag>
                                                     {validation.carrier && (
-                                                        <p style={{ marginTop: 8 }}>
-                                                            <Tag color="blue">{validation.carrier}</Tag>
-                                                        </p>
+                                                        <div className="mt-2">
+                                                            <Tag color="blue" className="rounded-md mx-0">{validation.carrier}</Tag>
+                                                        </div>
                                                     )}
                                                     {trackingUrl && (
-                                                        <Button
-                                                            type="link"
-                                                            href={trackingUrl}
-                                                            target="_blank"
-                                                            style={{ paddingLeft: 0 }}
-                                                        >
-                                                            🔍 Track Package
-                                                        </Button>
+                                                        <div className="mt-4">
+                                                            <Button
+                                                                type="link"
+                                                                href={trackingUrl}
+                                                                target="_blank"
+                                                                className="px-0 flex items-center gap-2 text-brand-600 hover:text-brand-700"
+                                                            >
+                                                                <i className="fi fi-rr-search"></i> Track Package
+                                                            </Button>
+                                                        </div>
                                                     )}
-                                                </Card>
-                                            </Col>
+                                                </div>
+                                            </CardContainer>
                                         );
                                     }
                                     return null;
                                 })()}
 
                                 {/* Action Buttons */}
-                                        <Col span={24}>
-                                    <Card title="⚡ Actions">
+                                <CardContainer>
+                                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                        <h3 className="font-heading font-semibold text-slate-700 text-sm">⚡ Actions</h3>
+                                    </div>
+                                    <div className="p-5">
                                         {getActionButtons()}
-                                            </Card>
-                                        </Col>
+                                    </div>
+                                </CardContainer>
 
                                 {/* Status History */}
-                                        <Col span={24}>
-                                    <Card title="📜 History">
+                                <CardContainer>
+                                    <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                        <h3 className="font-heading font-semibold text-slate-700 text-sm">📜 History</h3>
+                                    </div>
+                                    <div className="p-5">
                                         <Timeline
                                             items={data.status.map(item => ({
                                                 children: (
-                                                    <div>
+                                                    <div className="mb-2">
                                                         <OrderStatusTag status={item.status} />
-                                                        <h4 style={{ marginTop: 8 }}>{item.note}</h4>
+                                                        <h4 className="mt-2 font-medium text-slate-800 text-sm">{item.note}</h4>
                                                         {item.detail && (
-                                                            <Description>{item.detail}</Description>
+                                                            <p className="text-xs text-slate-500 mt-1">{item.detail}</p>
                                                         )}
-                                                        <Description>{formatDateTime(item.updateAt)}</Description>
+                                                        <p className="text-[10px] text-slate-400 mt-1">{formatDateTime(item.updateAt)}</p>
                                                     </div>
                                                 )
                                             })).reverse()}
+                                            className="mt-2"
                                         />
-                                            </Card>
-                                </Col>
-                            </Row>
-                        </Col>
-                    </Row>
-                </Col>
-            </Row>
-        </>
+                                    </div>
+                                </CardContainer>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </AdminLayout>
     );
 }
 
