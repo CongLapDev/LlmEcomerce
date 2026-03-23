@@ -20,10 +20,16 @@ function StockBar({ stock, threshold }) {
     );
 }
 
-function LowStockAlert({ data = [] }) {
+function LowStockAlert({ data = [], count = null, threshold = 5, onCardClick }) {
     const list = Array.isArray(data) ? data : [];
+    const displayCount = Number.isFinite(Number(count)) ? Number(count) : list.length;
+
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <button
+            type="button"
+            onClick={onCardClick}
+            className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 text-left w-full transition hover:border-red-200 cursor-pointer"
+        >
             <div className="flex items-center gap-2 mb-4">
                 <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
                     <i className="fi fi-rr-triangle-warning text-red-500 text-sm leading-none" />
@@ -31,7 +37,7 @@ function LowStockAlert({ data = [] }) {
                 <div>
                     <h3 className="text-sm font-semibold font-heading text-slate-800">Low Stock Alert</h3>
                     <p className="text-xs text-slate-400 font-body">
-                        {list.length} product{list.length !== 1 ? "s" : ""} below threshold
+                        {displayCount} product item{displayCount !== 1 ? "s" : ""} below threshold
                     </p>
                 </div>
             </div>
@@ -51,14 +57,14 @@ function LowStockAlert({ data = [] }) {
                                 {(item?.currentStock ?? 0) < 5 ? "Critical" : "Warning"}
                             </span>
                         </div>
-                        <StockBar stock={item?.currentStock ?? 0} threshold={10} />
+                        <StockBar stock={item?.currentStock ?? 0} threshold={threshold} />
                         <p className="text-[10px] text-slate-400 font-body mt-0.5 text-right">
-                            Threshold: 10
+                            Threshold: {threshold}
                         </p>
                     </li>
                 ))}
             </ul>
-        </div>
+        </button>
     );
 }
 

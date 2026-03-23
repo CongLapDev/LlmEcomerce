@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -133,6 +134,45 @@ public class ProductService {
             return productRepository.findAll(predicates,pageable).getContent();
         }
         return List.of();
+    }
+
+    /**
+     * Calculate minimum price from all product items
+     */
+    public BigDecimal calculateMinPrice(Product product) {
+        if (product.getProductItems() == null || product.getProductItems().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return product.getProductItems().stream()
+                .map(item -> item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO)
+                .min(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * Calculate maximum price from all product items
+     */
+    public BigDecimal calculateMaxPrice(Product product) {
+        if (product.getProductItems() == null || product.getProductItems().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return product.getProductItems().stream()
+                .map(item -> item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO)
+                .max(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * Calculate total stock from all warehouses across all product items
+     */
+    public Long calculateTotalStock(Product product) {
+        if (product.getProductItems() == null || product.getProductItems().isEmpty()) {
+            return 0L;
+        }
+        return product.getProductItems().stream()
+                .flatMap(item -> item.getWarehouses() != null ? item.getWarehouses().stream() : java.util.stream.Stream.empty())
+                .mapToLong(warehouse -> warehouse.getQty() != null ? warehouse.getQty() : 0)
+                .sum();
     }
 
 }

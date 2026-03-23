@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -56,6 +57,10 @@ public interface ProductRepository extends JpaRepository<Product,Integer>, JpaSp
 
     @NonNull
     Page<Product> findAll(@Nullable Specification<Product> specification, @NonNull Pageable pageable);
+
+    @Modifying
+    @Query(value = "UPDATE product SET status = :status WHERE id = :productId", nativeQuery = true)
+    void updateProductStatus(@Param("productId") Integer productId, @Param("status") String status);
 
             interface GlobalSearchProductProjection {
             Integer getProductId();

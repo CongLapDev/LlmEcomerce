@@ -20,6 +20,7 @@ export async function getDashboardStats() {
         totalUsers: 0,
         usersGrowthRate: 0,
         usersGrowth: 0,
+        lowStockCount: 0,
         topProducts: [],
         topCustomers: [],
         categoryRevenue: [],
@@ -117,9 +118,11 @@ export async function getRecentOrders({ limit = 10 } = {}) {
 }
 
 // ── Low Stock Products ────────────────────────────────────────────────────────
-export async function getLowStockProducts() {
+export async function getLowStockProducts(threshold = 5) {
     try {
-        const { data } = await APIBase.get("/admin/dashboard/low-stock");
+        const { data } = await APIBase.get("/admin/dashboard/low-stock", {
+            params: { threshold },
+        });
         return Array.isArray(data) ? data : [];
     } catch (err) {
         console.error("[dashboardService] getLowStockProducts failed:", err);

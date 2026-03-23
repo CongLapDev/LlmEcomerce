@@ -41,7 +41,7 @@ public class DashboardService {
     private final UserRepository userRepository;
         private final WarehouseItemRepository warehouseItemRepository;
 
-        private static final int LOW_STOCK_THRESHOLD = 10;
+        private static final int LOW_STOCK_THRESHOLD = 5;
         private static final int ACTIVITY_LIMIT = 5;
         private static final int TOP_LIMIT = 5;
         private static final int DEFAULT_SALES_DAYS = 30;
@@ -132,13 +132,11 @@ public class DashboardService {
 
         LocalDate today = now;
         LocalDate tomorrow = today.plusDays(1);
-        LocalDate sameDayLastMonth = today.minusMonths(1);
-        LocalDate sameDayLastMonthNext = sameDayLastMonth.plusDays(1);
+        LocalDate yesterday = today.minusDays(1);
 
         Date todayStartDate = asDate(today);
         Date tomorrowStartDate = asDate(tomorrow);
-        Date sameDayLastMonthStartDate = asDate(sameDayLastMonth);
-        Date sameDayLastMonthNextStartDate = asDate(sameDayLastMonthNext);
+        Date yesterdayStartDate = asDate(yesterday);
 
         log.info(
                 "Dashboard date windows - current [{} -> {}), previous [{} -> {})",
@@ -188,8 +186,8 @@ public class DashboardService {
                 shopOrderRepository.countOrdersBetween(todayStartDate, tomorrowStartDate)
         );
 
-        long ordersSameDayLastMonth = nonNull(
-                shopOrderRepository.countOrdersBetween(sameDayLastMonthStartDate, sameDayLastMonthNextStartDate)
+        long ordersYesterday = nonNull(
+                shopOrderRepository.countOrdersBetween(yesterdayStartDate, todayStartDate)
         );
 
         long totalProducts = productRepository.count();
@@ -234,7 +232,7 @@ public class DashboardService {
                 .toList();
 
         log.info(
-                "Dashboard aggregates - totalRevenue={}, currentMonthRevenue={}, previousMonthRevenue={}, totalUsers={}, currentMonthUsers={}, previousMonthUsers={}, ordersToday={}, ordersSameDayLastMonth={}, totalProducts={}, currentMonthNewProducts={}, previousMonthNewProducts={}",
+                "Dashboard aggregates - totalRevenue={}, currentMonthRevenue={}, previousMonthRevenue={}, totalUsers={}, currentMonthUsers={}, previousMonthUsers={}, ordersToday={}, ordersYesterday={}, totalProducts={}, currentMonthNewProducts={}, previousMonthNewProducts={}",
                 totalRevenue,
                 currentMonthRevenue,
                 previousMonthRevenue,
@@ -242,17 +240,14 @@ public class DashboardService {
                 currentMonthUsers,
                 previousMonthUsers,
                 ordersToday,
-                ordersSameDayLastMonth,
+                ordersYesterday,
                 totalProducts,
                 currentMonthNewProducts,
                 previousMonthNewProducts
         );
 
-        List<LowStockAlertDto> lowStockAlerts = warehouseItemRepository
-                .findLowStockProducts(LOW_STOCK_THRESHOLD)
-                .stream()
-                .map(item -> new LowStockAlertDto(item.getProductName(), nonNull(item.getCurrentStock())))
-                .toList();
+        List<LowStockAlertDto> lowStockAlerts = getLowStockAlerts(LOW_STOCK_THRESHOLD);
+        Long lowStockCount = nonNull(warehouseItemRepository.countLowStockProductItems(LOW_STOCK_THRESHOLD));
 
         List<ActivityFeedItemDto> activityFeed = buildRecentActivityFeed();
 
@@ -262,9 +257,10 @@ public class DashboardService {
                 calculateGrowthPercent(currentMonthRevenue, previousMonthRevenue),
                                 calculateGrowthPercent(BigDecimal.valueOf(currentMonthUsers), BigDecimal.valueOf(previousMonthUsers)),
                                 ordersToday,
-                                calculateGrowthPercent(BigDecimal.valueOf(ordersToday), BigDecimal.valueOf(ordersSameDayLastMonth)),
+                                calculateGrowthPercent(BigDecimal.valueOf(ordersToday), BigDecimal.valueOf(ordersYesterday)),
                                 totalProducts,
                                 calculateGrowthPercent(BigDecimal.valueOf(currentMonthNewProducts), BigDecimal.valueOf(previousMonthNewProducts)),
+                                                                lowStockCount,
                                 lowStockAlerts,
                                 activityFeed,
                                 topProducts,
@@ -272,6 +268,15 @@ public class DashboardService {
                                 categoryRevenue
         );
     }
+
+                public List<LowStockAlertDto> getLowStockAlerts(Integer threshold) {
+                                int safeThreshold = threshold == null || threshold <= 0 ? LOW_STOCK_THRESHOLD : threshold;
+                                return warehouseItemRepository
+                                                                .findLowStockProducts(safeThreshold)
+                                                                .stream()
+                                                                .map(item -> new LowStockAlertDto(item.getProductName(), nonNull(item.getCurrentStock())))
+                                                                .toList();
+                }
 
         private List<ActivityFeedItemDto> buildRecentActivityFeed() {
                 List<ActivityFeedItemDto> events = new ArrayList<>();

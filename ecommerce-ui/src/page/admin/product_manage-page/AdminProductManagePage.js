@@ -4,7 +4,7 @@ import { Space, Input, Pagination } from "antd";
 import { GlobalContext } from "../../../context";
 import APIBase, { getImageUrl } from "../../../api/ApiBase";
 import PlaceHolder from "../../../assets/image/product_placeholder.png";
-import { getProducts } from "../../../services/adminManageService";
+import { getAdminProducts } from "../../../services/adminManageService";
 
 import AdminLayout from "../../../components/layout/AdminLayout";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -13,6 +13,28 @@ import DataTable from "../../../components/ui/DataTable";
 import ActionButton from "../../../components/ui/ActionButton";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import ProductFilter from "../../../part/admin/product-filter/ProductFilter";
+
+// ── Currency Formatter ──────────────────────────────────────────────────────
+const formatVndPrice = (value) => {
+    if (!value) return "0 ₫";
+    const num = Number(value);
+    return num.toLocaleString("vi-VN", { 
+        style: "currency", 
+        currency: "VND",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    });
+};
+
+const formatPrice = (minPrice, maxPrice) => {
+    const min = Number(minPrice || 0);
+    const max = Number(maxPrice || 0);
+    
+    if (min === 0 && max === 0) return "—";
+    if (min === max) return formatVndPrice(min);
+    
+    return `${formatVndPrice(min)} - ${formatVndPrice(max)}`;
+};
 
 function AdminProductManagePage() {
     const globalContext = useContext(GlobalContext);
@@ -27,7 +49,7 @@ function AdminProductManagePage() {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const data = await getProducts(page.page, page.size, filter);
+            const data = await getAdminProducts(page.page, page.size, filter);
             setProductsData(data);
         } catch (error) {
             globalContext.message.error("Failed to load products");
@@ -85,26 +107,41 @@ function AdminProductManagePage() {
         },
         {
             title: "Category",
-            dataIndex: ["category", "name"],
             key: "category",
-            render: (text) => text ? <span className="text-slate-600 font-medium">{text}</span> : <span className="text-slate-400">-</span>
+            render: (_, record) => record.category?.name ? <span className="text-slate-600 font-medium">{record.category.name}</span> : <span className="text-slate-400">-</span>
         },
         {
-            title: "Price",
+            title: "Price Range",
             key: "price",
             render: (_, record) => {
-                // If options logic exists, try to get min price or base price
-                const priceMatch = record.options?.[0]?.price || 0;
-                return <span className="font-semibold text-slate-700 font-heading">${priceMatch.toLocaleString()}</span>;
+                const priceDisplay = formatPrice(record.minPrice, record.maxPrice);
+                return <span className="font-semibold text-slate-700 font-heading">{priceDisplay}</span>;
+            }
+        },
+        {
+            title: "Stock",
+            key: "stock",
+            render: (_, record) => {
+                const stock = Number(record.totalStock || 0);
+                const isInStock = stock > 0;
+                return (
+                    <div className="text-center">
+                        <span className={`font-semibold ${isInStock ? "text-emerald-600" : "text-red-600"}`}>
+                            {stock}
+                        </span>
+                    </div>
+                );
             }
         },
         {
             title: "Status",
             key: "status",
             render: (_, record) => {
-                // Determine mock stock status based on active or arbitrary field if stock isn't present
-                const isActive = record.active !== false;
-                return <StatusBadge status={isActive ? "active" : "inactive"} label={isActive ? "In Stock" : "Out of Stock"} />;
+                const stock = Number(record.totalStock || 0);
+                const isActive = record.isActive !== false;
+                const statusLabel = !isActive ? "Inactive" : stock > 0 ? "In Stock" : "Out of Stock";
+                const statusValue = !isActive ? "inactive" : stock > 0 ? "active" : "warning";
+                return <StatusBadge status={statusValue} label={statusLabel} />;
             }
         },
         {

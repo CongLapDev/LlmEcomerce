@@ -21,19 +21,70 @@ public interface WarehouseItemRepository extends JpaRepository<WarehouseItem, Pr
     void deleteByProductItemId(@Param("productItemId") Integer productItemId);
 
     @Query(value = """
-            SELECT p.name AS productName, COALESCE(SUM(piw.quantity), 0) AS currentStock
+            SELECT p.name AS productName, COALESCE(piw.quantity, 0) AS currentStock
             FROM product_item_in_warehouse piw
             JOIN product_item pi ON pi.id = piw.product_item_id
             JOIN product p ON p.id = pi.product_id
-            GROUP BY p.id, p.name
-            HAVING COALESCE(SUM(piw.quantity), 0) < :threshold
-            ORDER BY currentStock ASC, p.name ASC
+            WHERE COALESCE(piw.quantity, 0) < :threshold
+            ORDER BY currentStock ASC, p.name ASC, piw.product_item_id ASC
             """, nativeQuery = true)
     List<LowStockProjection> findLowStockProducts(@Param("threshold") Integer threshold);
+
+        @Query(value = """
+            SELECT COUNT(*)
+            FROM product_item_in_warehouse piw
+            WHERE COALESCE(piw.quantity, 0) < :threshold
+            """, nativeQuery = true)
+        Long countLowStockProductItems(@Param("threshold") Integer threshold);
+
+            @Query(value = """
+                SELECT
+                piw.product_item_id AS productItemId,
+                p.name AS productName,
+                piw.warehouse_id AS warehouseId,
+                w.name AS warehouseName,
+                piw.sku AS sku,
+                COALESCE(piw.quantity, 0) AS quantity
+                FROM product_item_in_warehouse piw
+                JOIN product_item pi ON pi.id = piw.product_item_id
+                JOIN product p ON p.id = pi.product_id
+                JOIN warehouse w ON w.id = piw.warehouse_id
+                ORDER BY p.name ASC, piw.warehouse_id ASC, piw.product_item_id ASC
+                """, nativeQuery = true)
+            List<StockLevelProjection> findAllStockLevels();
+
+            @Query(value = "SELECT COALESCE(SUM(quantity), 0) FROM product_item_in_warehouse WHERE warehouse_id = :warehouseId", nativeQuery = true)
+            Integer sumQuantityByWarehouseId(@Param("warehouseId") Integer warehouseId);
+
+            @Query(value = "SELECT COALESCE(SUM(quantity), 0) FROM product_item_in_warehouse WHERE product_item_id = :productItemId", nativeQuery = true)
+            Integer sumQuantityByProductItemId(@Param("productItemId") Integer productItemId);
+
+            @Query("""
+                            SELECT wi
+                            FROM WarehouseItem wi
+                            WHERE wi.productItem.id = :productItemId
+                                AND COALESCE(wi.qty, 0) > 0
+                            ORDER BY wi.qty DESC, wi.warehouse.id ASC
+                            """)
+            List<WarehouseItem> findAvailableStockByProductItemId(@Param("productItemId") Integer productItemId);
 
     interface LowStockProjection {
         String getProductName();
 
         Integer getCurrentStock();
+    }
+
+    interface StockLevelProjection {
+        Integer getProductItemId();
+
+        String getProductName();
+
+        Integer getWarehouseId();
+
+        String getWarehouseName();
+
+        String getSku();
+
+        Integer getQuantity();
     }
 }

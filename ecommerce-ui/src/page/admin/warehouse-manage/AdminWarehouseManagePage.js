@@ -1,8 +1,9 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Space } from "antd";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { GlobalContext } from "../../../context";
 import { getWarehouses } from "../../../services/adminManageService";
+import { getLowStockProducts } from "../../../services/dashboardService";
 
 import AdminLayout from "../../../components/layout/AdminLayout";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -14,8 +15,13 @@ import StatusBadge from "../../../components/ui/StatusBadge";
 function AdminWarehouseManagePage() {
     const globalContext = useContext(GlobalContext);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [warehouses, setWarehouses] = useState([]);
+    const [lowStockItems, setLowStockItems] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const isLowStockView = searchParams.get("view") === "low-stock";
+    const lowStockThreshold = Number(searchParams.get("threshold") || 5);
 
     const fetchWarehouses = async () => {
         setLoading(true);
@@ -29,9 +35,25 @@ function AdminWarehouseManagePage() {
         }
     };
 
+    const fetchLowStockItems = async () => {
+        setLoading(true);
+        try {
+            const data = await getLowStockProducts(lowStockThreshold);
+            setLowStockItems(data);
+        } catch (error) {
+            globalContext.message.error("Failed to load low stock items");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
+        if (isLowStockView) {
+            fetchLowStockItems();
+            return;
+        }
         fetchWarehouses();
-    }, []);
+    }, [isLowStockView, lowStockThreshold]);
 
     const columns = [
         {
@@ -91,14 +113,47 @@ function AdminWarehouseManagePage() {
         }
     ];
 
+    const lowStockColumns = [
+        {
+            title: "Product",
+            dataIndex: "productName",
+            key: "productName",
+            render: (text) => <span className="font-semibold text-slate-700">{text || "Unknown Product"}</span>
+        },
+        {
+            title: "Current Stock",
+            dataIndex: "currentStock",
+            key: "currentStock",
+            render: (value) => <span className="text-xs text-slate-600">{value ?? 0}</span>
+        },
+        {
+            title: "Severity",
+            key: "severity",
+            render: (_, record) => (
+                <StatusBadge
+                    status={(record?.currentStock ?? 0) < 3 ? "danger" : "warning"}
+                    label={(record?.currentStock ?? 0) < 3 ? "Critical" : "Warning"}
+                />
+            )
+        }
+    ];
+
     const actions = (
         <>
             <ActionButton
                 variant="secondary"
                 icon="fi fi-rr-refresh"
                 label="Refresh"
-                onClick={fetchWarehouses}
+                onClick={isLowStockView ? fetchLowStockItems : fetchWarehouses}
             />
+            {isLowStockView && (
+                <ActionButton
+                    variant="ghost"
+                    icon="fi fi-rr-arrow-left"
+                    label="Back to Warehouses"
+                    onClick={() => navigate("/admin/warehouse")}
+                />
+            )}
             <ActionButton
                 variant="primary"
                 icon="fi fi-rr-plus"
@@ -111,16 +166,20 @@ function AdminWarehouseManagePage() {
     return (
         <AdminLayout>
             <PageHeader 
-                title="Warehouse Management" 
-                subtitle="Manage your inventory hubs and storage locations" 
+                title={isLowStockView ? "Low Stock Items" : "Warehouse Management"}
+                subtitle={
+                    isLowStockView
+                        ? `All product items with quantity below ${lowStockThreshold}`
+                        : "Manage your inventory hubs and storage locations"
+                }
                 actions={actions} 
             />
 
             <CardContainer>
                 <DataTable
-                    columns={columns}
-                    dataSource={warehouses}
-                    rowKey="id"
+                    columns={isLowStockView ? lowStockColumns : columns}
+                    dataSource={isLowStockView ? lowStockItems : warehouses}
+                    rowKey={isLowStockView ? (record) => `${record?.productName}-${record?.currentStock}` : "id"}
                     loading={loading}
                     pagination={false}
                 />

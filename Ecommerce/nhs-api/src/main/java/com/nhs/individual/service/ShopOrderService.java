@@ -4,10 +4,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.nhs.individual.constant.OrderStatus;
 import com.nhs.individual.constant.PaymentStatus;
+import com.nhs.individual.constant.WarehouseStatus;
+import com.nhs.individual.domain.OrderLine;
 import com.nhs.individual.domain.ShopOrder;
 import com.nhs.individual.domain.ShopOrderStatus;
+import com.nhs.individual.domain.Warehouse;
+import com.nhs.individual.domain.WarehouseItem;
+import com.nhs.individual.repository.ProductRepository;
 import com.nhs.individual.repository.ShopOrderRepository;
 import com.nhs.individual.repository.ShippingMethodRepository;
+import com.nhs.individual.repository.WareHouseRepository;
+import com.nhs.individual.repository.WarehouseItemRepository;
 import com.nhs.individual.zalopay.config.ZaloConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,11 +22,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -31,6 +43,12 @@ public class ShopOrderService {
     ShopOrderRepository orderRepository;
     @Autowired
     ShippingMethodRepository shippingMethodRepository;
+    @Autowired
+    WarehouseItemRepository warehouseItemRepository;
+    @Autowired
+    ProductRepository productRepository;
+    @Autowired
+    WareHouseRepository wareHouseRepository;
     @Autowired
     AuthService authService;
     public Optional<ShopOrder> findById(Integer id){
@@ -54,6 +72,7 @@ public class ShopOrderService {
      * @param order Order to create (total will be recalculated on server)
      * @return Created order with correct total
      */
+    @Transactional
     public ShopOrder createOrder(ShopOrder order) {
         log.info("========== Creating Order ==========");
         log.info("User ID: {}", order.getUser() != null ? order.getUser().getId() : "NULL");
@@ -144,6 +163,9 @@ public class ShopOrderService {
         order.getOrderLines().forEach(line -> line.setOrder(order));
         order.getPayment().setOrder(order);
         order.getPayment().setStatus(PaymentStatus.PENDING.value);
+
+        // Deduct inventory before persisting order. If stock is insufficient, this throws and order is not created.
+        deductStockForOrder(order);
         
         ShopOrder savedOrder = orderRepository.save(order);
         log.info("✓ Order #{} created successfully with total: {}", savedOrder.getId(), savedOrder.getTotal());
@@ -153,6 +175,108 @@ public class ShopOrderService {
 
     public Collection<ShopOrder> findAllByUserId(int userId, Pageable pageable) {
         return orderRepository.findAllByUser_Id(userId,pageable);
+    }
+
+    private void deductStockForOrder(ShopOrder order) {
+        if (order.getOrderLines() == null || order.getOrderLines().isEmpty()) {
+            throw new IllegalArgumentException("Order must contain at least one item");
+        }
+
+        Map<Integer, Integer> requiredByProductItem = new HashMap<>();
+        for (OrderLine line : order.getOrderLines()) {
+            if (line.getProductItem() == null || line.getProductItem().getId() == null) {
+                throw new IllegalArgumentException("Order line must contain a valid product item");
+            }
+            Integer qty = line.getQty();
+            if (qty == null || qty <= 0) {
+                throw new IllegalArgumentException("Order line quantity must be greater than 0");
+            }
+            requiredByProductItem.merge(line.getProductItem().getId(), qty, Integer::sum);
+        }
+
+        for (Map.Entry<Integer, Integer> entry : requiredByProductItem.entrySet()) {
+            Integer productItemId = entry.getKey();
+            Integer requiredQty = entry.getValue();
+
+            Integer totalAvailable = nonNull(warehouseItemRepository.sumQuantityByProductItemId(productItemId));
+            if (totalAvailable < requiredQty) {
+                throw new IllegalArgumentException(
+                        "Out of Stock: product_item_id=" + productItemId +
+                                " requires " + requiredQty + " but only " + totalAvailable + " available"
+                );
+            }
+
+            List<WarehouseItem> stocks = warehouseItemRepository.findAvailableStockByProductItemId(productItemId);
+            int remaining = requiredQty;
+            Set<Integer> affectedWarehouseIds = new HashSet<>();
+
+            for (WarehouseItem stock : stocks) {
+                if (remaining <= 0) {
+                    break;
+                }
+                int currentQty = nonNull(stock.getQty());
+                if (currentQty <= 0) {
+                    continue;
+                }
+
+                int deductQty = Math.min(currentQty, remaining);
+                stock.setQty(currentQty - deductQty);
+                remaining -= deductQty;
+
+                if (stock.getWarehouse() != null && stock.getWarehouse().getId() != null) {
+                    affectedWarehouseIds.add(stock.getWarehouse().getId());
+                }
+            }
+
+            if (remaining > 0) {
+                throw new IllegalArgumentException(
+                        "Out of Stock: unable to deduct enough quantity for product_item_id=" + productItemId
+                );
+            }
+
+            warehouseItemRepository.saveAll(stocks);
+
+            Integer remainingTotal = nonNull(warehouseItemRepository.sumQuantityByProductItemId(productItemId));
+            Integer productId = null;
+            if (!stocks.isEmpty() && stocks.get(0).getProductItem() != null) {
+                if (stocks.get(0).getProductItem().getProductId() != null) {
+                    productId = stocks.get(0).getProductItem().getProductId();
+                } else if (stocks.get(0).getProductItem().getProduct() != null) {
+                    productId = stocks.get(0).getProductItem().getProduct().getId();
+                }
+            }
+            if (productId != null) {
+                if (remainingTotal <= 0) {
+                    productRepository.updateProductStatus(productId, "UNAVAILABLE");
+                } else {
+                    productRepository.updateProductStatus(productId, "AVAILABLE");
+                }
+            }
+
+            for (Integer warehouseId : affectedWarehouseIds) {
+                refreshWarehouseStatusAfterDeduction(warehouseId);
+            }
+        }
+    }
+
+    private void refreshWarehouseStatusAfterDeduction(Integer warehouseId) {
+        Warehouse warehouse = wareHouseRepository.findById(warehouseId).orElse(null);
+        if (warehouse == null || Boolean.TRUE.equals(warehouse.getStatusManualOverride())) {
+            return;
+        }
+
+        Integer totalStock = nonNull(warehouseItemRepository.sumQuantityByWarehouseId(warehouseId));
+        Integer maxCapacity = warehouse.getMaxCapacity();
+        if (maxCapacity != null && maxCapacity > 0 && totalStock >= maxCapacity) {
+            warehouse.setStatus(WarehouseStatus.FULL);
+        } else {
+            warehouse.setStatus(WarehouseStatus.OPERATIONAL);
+        }
+        wareHouseRepository.save(warehouse);
+    }
+
+    private Integer nonNull(Integer value) {
+        return value == null ? 0 : value;
     }
 
 }

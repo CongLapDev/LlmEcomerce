@@ -57,11 +57,12 @@ function KPIStats({ data = null }) {
                 const numericGrowth = Number(growth ?? 0);
                 const hasNoData = Number(value ?? 0) === 0 && numericGrowth === 0;
                 const positive = growth === "New" || numericGrowth > 0;
+                const comparisonLabel = card.key === "ordersToday" ? "vs yesterday" : "vs last month";
                 const trendText = hasNoData
                     ? "No data yet"
                     : growth === "New"
                         ? "New"
-                        : `${positive ? "+" : ""}${numericGrowth}% vs last month`;
+                        : `${positive ? "+" : ""}${numericGrowth}% ${comparisonLabel}`;
 
                 return (
                     <div

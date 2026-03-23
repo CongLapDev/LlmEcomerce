@@ -3,6 +3,9 @@ package com.nhs.individual.controller;
 import com.nhs.individual.domain.Product;
 import com.nhs.individual.domain.Warehouse;
 import com.nhs.individual.domain.WarehouseItem;
+import com.nhs.individual.dto.StockLevelDto;
+import com.nhs.individual.dto.StockUpdateRequest;
+import com.nhs.individual.dto.WarehouseStatusUpdateRequest;
 import com.nhs.individual.exception.ResourceNotFoundException;
 import com.nhs.individual.service.ProductService;
 import com.nhs.individual.service.WareHouseItemService;
@@ -18,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
+
 @PreAuthorize("hasAuthority('ADMIN')")
 @RestController
 @RequestMapping("/api/v1/warehouse")
@@ -32,6 +36,12 @@ public class WarehouseController {
     public Collection<Warehouse> findAll(){
         return wareHouseService.findAll();
     }
+
+    @RequestMapping(value = "/stock-levels", method = RequestMethod.GET)
+    public Collection<StockLevelDto> getStockLevels() {
+        return wareHouseService.getStockLevels();
+    }
+
     @RequestMapping(value = "/{warehouse_id}",method = RequestMethod.GET)
     public Warehouse findById(@PathVariable(name = "warehouse_id") Integer id){
         return wareHouseService.findById(id).orElseThrow(()->new ResourceNotFoundException("Warehouse not found"));
@@ -44,6 +54,14 @@ public class WarehouseController {
     public Warehouse update(@PathVariable(name = "warehouse_id") Integer id, Warehouse wareHouse){
         return wareHouseService.update(id,wareHouse);
     }
+
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @RequestMapping(value = "/{warehouse_id}/status", method = RequestMethod.PATCH)
+    public Warehouse updateWarehouseStatus(@PathVariable(name = "warehouse_id") Integer id,
+                                           @RequestBody WarehouseStatusUpdateRequest request) {
+        return wareHouseService.updateWarehouseStatus(id, request.getStatus(), request.getManualOverride());
+    }
+
     @PreAuthorize("hasAuthority('ADMIN')")
     @RequestMapping(value = "/{warehouse_id}",method = RequestMethod.DELETE)
     public void deleteById(@PathVariable(name = "warehouse_id") Integer id){
@@ -91,6 +109,15 @@ public class WarehouseController {
                                     @RequestBody WarehouseItem warehouseItem){
         wareHouseItemService.update(warehouseId, id,warehouseItem);
     }
+
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @RequestMapping(value = "/{warehouse_id}/stock/{item_id}", method = RequestMethod.POST)
+    public WarehouseItem addOrUpdateStock(@PathVariable(name = "warehouse_id") Integer warehouseId,
+                                          @PathVariable(name = "item_id") Integer itemId,
+                                          @RequestBody StockUpdateRequest request) {
+        return wareHouseService.addOrUpdateStock(warehouseId, itemId, request.getQuantity(), request.getSku());
+    }
+
     @PreAuthorize("hasAuthority('ADMIN')")
     @RequestMapping(value = "/{warehouseId}/item/{id}",method = RequestMethod.DELETE)
     public void deleteItem(@PathVariable(name = "warehouseId") Integer warehouseId,

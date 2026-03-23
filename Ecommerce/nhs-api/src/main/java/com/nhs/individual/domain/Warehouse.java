@@ -1,6 +1,7 @@
 package com.nhs.individual.domain;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.nhs.individual.constant.WarehouseStatus;
 import com.nhs.individual.validation.AddressValidation;
 import com.nhs.individual.validation.UserAddressValidation;
 import com.nhs.individual.validation.WarehouseValidation;
@@ -33,6 +34,17 @@ public class Warehouse {
     private String name;
     @Column(name = "detail")
     private String detail;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    private WarehouseStatus status = WarehouseStatus.OPERATIONAL;
+
+    @Column(name = "max_capacity")
+    private Integer maxCapacity;
+
+    @Column(name = "status_manual_override")
+    private Boolean statusManualOverride = false;
+
     @OneToMany(mappedBy = "warehouse")
     @JsonManagedReference
     public Collection<WarehouseItem> warehouseItems;

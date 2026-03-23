@@ -29,6 +29,21 @@ export async function getProducts(page = 0, size = 10, filterParams = {}) {
     }
 }
 
+/**
+ * getAdminProducts - Fetch products with calculated min/max prices and stock info
+ * Uses the new /api/v1/admin/products endpoint
+ */
+export async function getAdminProducts(page = 0, size = 10, filterParams = {}) {
+    try {
+        const params = new URLSearchParams({ page, size, ...filterParams });
+        const { data } = await APIBase.get(`/api/v1/admin/products?${params.toString()}`);
+        return data; // expected: { content: [], totalElements: 0, pageable: {...} }
+    } catch (err) {
+        console.error("getAdminProducts failed:", err);
+        return { content: [], totalElements: 0 };
+    }
+}
+
 // ── Orders ──────────────────────────────────────────────────────────────────
 export async function getOrders(page = 0, size = 10, filterParams = {}) {
     try {

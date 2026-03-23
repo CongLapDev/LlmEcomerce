@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useContext } from "react";
 import AdminLayout from "../../../components/layout/AdminLayout";
 import KPIStats from "../../../components/dashboard/KPIStats";
 import SalesChart from "../../../components/dashboard/SalesChart";
@@ -9,6 +9,8 @@ import TopCustomers from "../../../components/dashboard/TopCustomers";
 import RecentOrdersTable from "../../../components/dashboard/RecentOrdersTable";
 import LowStockAlert from "../../../components/dashboard/LowStockAlert";
 import ActivityFeed from "../../../components/dashboard/ActivityFeed";
+import APIBase from "../../../api/ApiBase";
+import { GlobalContext } from "../../../context";
 import {
     getDashboardStats,
     getSalesChart,
@@ -18,6 +20,7 @@ import {
     getTopCustomers,
     getRecentOrders,
 } from "../../../services/dashboardService";
+import { useNavigate } from "react-router-dom";
 
 // ── Loading skeleton card ────────────────────────────────────────────────────
 function SkeletonCard({ className = "" }) {
@@ -61,7 +64,10 @@ function ErrorBanner({ message, onRetry }) {
 
 // ── Main Dashboard Page ───────────────────────────────────────────────────────
 function AdminDashboardPage() {
+    const globalContext = useContext(GlobalContext);
+    const LOW_STOCK_THRESHOLD = 5;
     const CATEGORY_COLORS = ["#2563eb", "#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe", "#1d4ed8"];
+    const navigate = useNavigate();
 
     const toCategoryChartData = useCallback((raw = []) => {
         const list = Array.isArray(raw) ? raw : [];
@@ -103,8 +109,42 @@ function AdminDashboardPage() {
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [exporting, setExporting] = useState(false);
 
-    // ── Fetch all dashboard data in parallel ──────────────────────────────────
+    // ── Export Dashboard Report ─────────────────────────────────────────────
+    const handleExportDashboard = useCallback(async () => {
+        setExporting(true);
+        try {
+            const response = await APIBase.get("/api/v1/admin/dashboard/export", {
+                responseType: "blob",
+                timeout: 60000, // 60 seconds timeout for file generation
+            });
+
+            // Create blob URL and trigger download
+            const blob = response.data;
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `dashboard_report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            globalContext?.message?.success?.("Dashboard report exported successfully");
+        } catch (err) {
+            console.error("[Dashboard] Export failed:", err);
+            globalContext?.message?.error?.(
+                err?.response?.data?.message ||
+                err?.message ||
+                "Failed to export dashboard report"
+            );
+        } finally {
+            setExporting(false);
+        }
+    }, [globalContext]);
+
+    // ── State ──
     const fetchAll = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -200,9 +240,13 @@ function AdminDashboardPage() {
                                 <i className={`fi fi-rr-refresh text-xs leading-none ${loading ? "animate-spin" : ""}`} />
                                 <span>Refresh</span>
                             </button>
-                            <button className="flex items-center gap-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer shadow-sm shadow-brand-600/20">
-                                <i className="fi fi-rr-download text-xs leading-none" />
-                                <span>Export</span>
+                            <button
+                                onClick={handleExportDashboard}
+                                disabled={exporting}
+                                className="flex items-center gap-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 px-4 py-2 rounded-xl transition-all duration-200 cursor-pointer shadow-sm shadow-brand-600/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <i className={`fi fi-rr-download text-xs leading-none ${exporting ? "animate-spin" : ""}`} />
+                                <span>{exporting ? "Exporting..." : "Export"}</span>
                             </button>
                         </div>
                     </div>
@@ -255,7 +299,14 @@ function AdminDashboardPage() {
                         <div className="lg:col-span-1">
                             {loading
                                 ? <SkeletonChart height="h-64" />
-                                : <LowStockAlert data={lowStock} />
+                                : (
+                                    <LowStockAlert
+                                        data={lowStock}
+                                        count={kpi?.lowStockCount}
+                                        threshold={LOW_STOCK_THRESHOLD}
+                                        onCardClick={() => navigate(`/admin/warehouse?view=low-stock&threshold=${LOW_STOCK_THRESHOLD}`)}
+                                    />
+                                )
                             }
                         </div>
                         <div className="lg:col-span-2">

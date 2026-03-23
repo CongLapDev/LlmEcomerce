@@ -53,10 +53,16 @@ public class Product {
     @Column(name = "created_at", updatable = false, columnDefinition = "DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6)")
     private Instant createdAt;
 
+    @Column(name = "status", length = 20)
+    private String status = "AVAILABLE";
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (status == null || status.isBlank()) {
+            status = "AVAILABLE";
         }
     }
 

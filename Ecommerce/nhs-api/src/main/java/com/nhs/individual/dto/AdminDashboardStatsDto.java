@@ -13,6 +13,7 @@ public class AdminDashboardStatsDto implements Serializable {
     private final BigDecimal ordersTodayGrowth;
     private final Long totalProducts;
     private final BigDecimal productsGrowth;
+    private final Long lowStockCount;
     private final List<LowStockAlertDto> lowStockAlerts;
     private final List<ActivityFeedItemDto> activityFeed;
     private final List<TopProductDto> topProducts;
@@ -28,6 +29,7 @@ public class AdminDashboardStatsDto implements Serializable {
             BigDecimal ordersTodayGrowth,
             Long totalProducts,
             BigDecimal productsGrowth,
+            Long lowStockCount,
             List<LowStockAlertDto> lowStockAlerts,
             List<ActivityFeedItemDto> activityFeed,
             List<TopProductDto> topProducts,
@@ -42,6 +44,7 @@ public class AdminDashboardStatsDto implements Serializable {
         this.ordersTodayGrowth = ordersTodayGrowth;
         this.totalProducts = totalProducts;
         this.productsGrowth = productsGrowth;
+        this.lowStockCount = lowStockCount == null ? 0L : lowStockCount;
         this.lowStockAlerts = lowStockAlerts == null ? List.of() : lowStockAlerts;
         this.activityFeed = activityFeed == null ? List.of() : activityFeed;
         this.topProducts = topProducts == null ? List.of() : topProducts;
@@ -87,6 +90,10 @@ public class AdminDashboardStatsDto implements Serializable {
 
     public BigDecimal getProductsGrowth() {
         return productsGrowth;
+    }
+
+    public Long getLowStockCount() {
+        return lowStockCount;
     }
 
     public List<LowStockAlertDto> getLowStockAlerts() {
