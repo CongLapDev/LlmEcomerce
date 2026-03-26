@@ -27,6 +27,7 @@ public class OrderLine {
 
 
 
+    @Min(value = 1, message = "Order line quantity must be at least 1")
     @Column(name = "qty")
     private Integer qty;
     @Column(name = "total", precision = 18,scale = 9)

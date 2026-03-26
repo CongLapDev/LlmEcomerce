@@ -45,8 +45,78 @@ public class WareHouseItemService {
         WarehouseItem warehouseItem1=repository.save(warehouseItem);
         return warehouseItem1;
     }
+    @Autowired
+    com.nhs.individual.repository.ProductItemRepository productItemRepository;
+
     @Transactional
     public List<WarehouseItem> importGoods(@Validated(WarehouseValidation.onCreate.class) List<@Valid WarehouseItem> warehouseItems){
         return repository.saveAll(warehouseItems);
+    }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WareHouseItemService.class);
+
+    @Transactional
+    public List<WarehouseItem> importGoodsBySku(List<com.nhs.individual.dto.WarehouseItemImportDto> importDtos, List<String> errors) {
+        java.util.List<WarehouseItem> savedItems = new java.util.ArrayList<>();
+        
+        log.info("Starting warehouse import process for {} items", importDtos.size());
+        
+        for (int i = 0; i < importDtos.size(); i++) {
+            com.nhs.individual.dto.WarehouseItemImportDto dto = importDtos.get(i);
+            int rowNumber = i + 2; // Approximate Excel row number
+
+            log.info("Processing row {}: SKU='{}', Qty={}", rowNumber, dto.getSku(), dto.getQty());
+
+            try {
+                // 1. Basic Quantity Validation
+                if (dto.getQty() == null || dto.getQty() < 0) {
+                    errors.add("Row " + rowNumber + ": Invalid quantity (" + dto.getQty() + ") for SKU '" + dto.getSku() + "'");
+                    continue;
+                }
+
+                // 2. Discover ProductItem by SKU Map
+                Optional<ProductItem> productItemOpt = productItemRepository.findBySku(dto.getSku());
+                if (productItemOpt.isEmpty()) {
+                    log.warn("Row {}: SKU '{}' not found. Skipping.", rowNumber, dto.getSku());
+                    errors.add("Row " + rowNumber + ": SKU '" + dto.getSku() + "' not found in system");
+                    continue; // Correctly skip invalid row
+                }
+                ProductItem productItem = productItemOpt.get();
+
+                // 3. Prevent detached composite key override - query existing DB
+                ProductItemInWarehouseId id = new ProductItemInWarehouseId(productItem.getId(), dto.getWarehouseId());
+                
+                WarehouseItem warehouseItem = repository.findById(id).orElseGet(() -> {
+                    log.info("Row {}: Constructing NEW WarehouseItem mapping for SKU '{}'", rowNumber, dto.getSku());
+                    WarehouseItem newItem = new WarehouseItem();
+                    newItem.setId(id);
+                    
+                    Warehouse warehouse = new Warehouse();
+                    warehouse.setId(dto.getWarehouseId());
+                    
+                    newItem.setWarehouse(warehouse);
+                    newItem.setProductItem(productItem);
+                    newItem.setQty(0);
+                    return newItem;
+                });
+
+                // 4. Safely handle quantities (INCREMENT!)
+                int currentQty = warehouseItem.getQty() == null ? 0 : warehouseItem.getQty();
+                warehouseItem.setQty(currentQty + dto.getQty());
+
+                // 5. Per-Row Save with Catch Block
+                WarehouseItem savedItem = repository.save(warehouseItem);
+                savedItems.add(savedItem);
+                
+                log.info("Row {}: Successfully saved SKU '{}' - New Total Qty: {}", rowNumber, dto.getSku(), savedItem.getQty());
+                
+            } catch (Exception e) {
+                log.error("Row {}: FATAL error parsing SKU '{}': {}", rowNumber, dto.getSku(), e.getMessage(), e);
+                errors.add("Row " + rowNumber + ": System failed to save SKU '" + dto.getSku() + "'. Reason: " + e.getMessage());
+            }
+        }
+        
+        log.info("Import process finished. Successfully saved {}/{} variants.", savedItems.size(), importDtos.size());
+        return savedItems;
     }
 }

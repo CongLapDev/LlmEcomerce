@@ -8,6 +8,8 @@ import { AddressTag, PrefixIcon, Description } from "../../../components";
 import AddressAddModal from "../../../part/address-add-modal/AddressAddModal.js";
 import { GlobalContext } from "../../../context/index.js";
 import { useLocation, useNavigate } from "react-router-dom";
+import { checkStock } from "../../../api/stock.js";
+
 function UserOrderCheckOutPage() {
     const { state } = useLocation();
     const { data } = state;
@@ -56,8 +58,26 @@ function UserOrderCheckOutPage() {
         return value ? Number.parseInt(value).toLocaleString('vi-VN') + ' VND' : '0 VND';
     }
 
-    function submitHandler(value) {
+    async function submitHandler(value) {
         globalContext.loader(true);
+
+        try {
+            // Pre-submit stock validation
+            const stockCheckPayload = data.map(item => ({
+                productItemId: item.productItem.id,
+                requestedQty: item.qty || 1
+            }));
+            const stockResults = await checkStock(stockCheckPayload);
+            const failedItems = stockResults.filter(r => !r.isAvailable);
+
+            if (failedItems.length > 0) {
+                globalContext.message.error("Some items are out of stock or have insufficient quantity. Please review your cart.");
+                globalContext.loader(false);
+                return; // Abort order submission
+            }
+        } catch (error) {
+            console.error("Pre-submit stock validation failed", error);
+        }
 
         // Get the selected shipping method to calculate total correctly
         const selectedShipMethod = shipMethods && shipMethods.find(method => method.id == value.shipmethod);

@@ -8,6 +8,7 @@ import com.nhs.individual.service.ShopOrderService;
 import com.nhs.individual.service.ShopOrderStatusService;
 import com.nhs.individual.specification.ISpecification.IShopOrderSpecification;
 import com.nhs.individual.workbook.ShopOrdersXLSX;
+import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -64,7 +65,7 @@ public class ShopOrderController {
      */
     @PostMapping
     @PreAuthorize("#order.user.id == authentication.principal.userId")
-    public ShopOrder createOrder(@RequestBody ShopOrder order) {
+    public ShopOrder createOrder(@Valid @RequestBody ShopOrder order) {
         log.info("Creating order for user {}", order.getUser().getId());
         return shopOrderService.createOrder(order);
     }
@@ -244,7 +245,7 @@ public class ShopOrderController {
         String detail = body != null ? body.get("detail") : null;
         log.info("Cancelling order {}: {}", orderId, note);
         
-        ShopOrderStatus status = shopOrderStatusService.cancelOrder(orderId, note, detail);
+        ShopOrderStatus status = shopOrderService.cancelOrder(orderId, note, detail);
         return ResponseEntity.ok(status);
     }
     

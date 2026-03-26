@@ -3,6 +3,7 @@ package com.nhs.individual.controller;
 import com.nhs.individual.domain.CartItem;
 import com.nhs.individual.service.AuthService;
 import com.nhs.individual.service.CartItemService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,11 +28,11 @@ public class CartController {
     }
     @PreAuthorize("#cart.user.id==authentication.principal.userId or hasAuthority('ADMIN')")
     @RequestMapping(method = RequestMethod.POST)
-    public CartItem create(@RequestBody CartItem cart){
+    public CartItem create(@Valid @RequestBody CartItem cart){
         return cartItemService.save(cart);
     }
     @RequestMapping(value = "/{id}", method = RequestMethod.PUT)
-    public CartItem updateById(@PathVariable Integer id, @RequestBody CartItem cart){
+    public CartItem updateById(@PathVariable Integer id, @Valid @RequestBody CartItem cart){
         cart.setId(id);
         return cartItemService.update(id,cart);
     }

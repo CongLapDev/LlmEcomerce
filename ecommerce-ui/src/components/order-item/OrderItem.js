@@ -31,7 +31,8 @@ function OrderItem({ data, disabled, onChange, ...props }) {
 
     }
     function updateQty(value) {
-        data.qty = Number.parseInt(value);
+        const parsed = Number.parseInt(value);
+        data.qty = (!parsed || parsed < 1) ? 1 : parsed;
         if (onChange) onChange(data);
     }
     function saveItem() {

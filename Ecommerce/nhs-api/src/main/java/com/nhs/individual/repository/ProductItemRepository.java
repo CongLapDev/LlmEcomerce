@@ -13,4 +13,6 @@ public interface ProductItemRepository extends JpaRepository<ProductItem,Integer
     @Modifying
     @Query(value = "Update product_item set price=?2 where id",nativeQuery = true)
     void updateProductItem(Integer productItemId, BigDecimal price);
+
+    java.util.Optional<ProductItem> findBySku(String sku);
 }

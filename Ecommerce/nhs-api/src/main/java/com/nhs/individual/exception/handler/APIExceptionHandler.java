@@ -140,6 +140,19 @@ public class APIExceptionHandler {
                 .ok();
     }
 
+    @ExceptionHandler(com.nhs.individual.exception.InsufficientStockException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ResponseMessage handleInsufficientStock(com.nhs.individual.exception.InsufficientStockException e) {
+        return ResponseMessage
+                .builder()
+                .message(e.getMessage())
+                .details(String.format(
+                        "productItemId=%d requested=%d available=%d",
+                        e.getProductItemId(), e.getRequested(), e.getAvailable()))
+                .error()
+                .ok();
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     @ResponseStatus(value = HttpStatus.UNAUTHORIZED)
     public ResponseEntity<ResponseMessage> handleAuthenticationException(BadCredentialsException e) {

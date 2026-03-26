@@ -6,8 +6,9 @@ import APIBase from "../../../api/ApiBase";
 import { useNavigate } from "react-router-dom";
 import useAuth from "../../../secure/useAuth";
 import { Spin } from "antd";
-import { Currency } from "../../../components";
-import { ShoppingCartOutlined, ShopOutlined } from '@ant-design/icons';
+import { Currency, StockBadge } from "../../../components";
+import { ShoppingCartOutlined, ShopOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { useStockValidation } from "../../../hooks/useStockValidation";
 function UserCart() {
     const [state, user] = useAuth();
     const [page, setPage] = useState({
@@ -18,6 +19,10 @@ function UserCart() {
     const [data, setData] = useState([]);
     const [selectedItems, setSelectedItem] = useState([]);
     const [load, setLoad] = useState(false);
+    
+    // Custom hook for debounced & cached stock checking
+    const { stockMap, hasOutOfStock } = useStockValidation(data);
+    
     const loadingRef = useRef(false);
     const pageRef = useRef(page);
 
@@ -192,11 +197,29 @@ function UserCart() {
     return (<Row gutter={[12, 12]} className={style.cartLayout}>
         <Col span={24} md={{ span: 14 }} lg={{ span: 15 }}>
             <div title="Your Item">
-                {data.map((item) => <Row className={style.cartRow} gutter={[8, 8]} key={item.id} align="middle">
-                    <Col xs={2} sm={2} md={2} lg={1}><input type='checkbox' checked={selectedItems.some(selectedItem_ => selectedItem_.id === item.id)} value={item.id} onChange={onCheckItem} /></Col>
-                    <Col xs={20} sm={20} md={20} lg={22}><OrderItem onChange={(payload) => handleItemChange(item.id, payload)} data={item} /></Col>
-                    <Col xs={2} sm={2} md={2} lg={1} className={style.deleteBtn} onClick={() => handleDelete(item.id)}><i className="fi fi-br-cross-small"></i></Col>
-                </Row>)}
+                {data.map((item) => {
+                    const stockInfo = stockMap[item.productItem.id];
+                    const isInvalid = stockInfo && !stockInfo.isAvailable;
+                    
+                    return (
+                    <Row 
+                        className={style.cartRow} 
+                        gutter={[8, 8]} 
+                        key={item.id} 
+                        align="middle"
+                        style={isInvalid ? { border: '1px solid #ff4d4f', backgroundColor: '#fff2f0', borderRadius: '8px', padding: '4px' } : {}}
+                    >
+                        <Col xs={2} sm={2} md={2} lg={1}><input type='checkbox' checked={selectedItems.some(selectedItem_ => selectedItem_.id === item.id)} value={item.id} onChange={onCheckItem} /></Col>
+                        <Col xs={20} sm={20} md={20} lg={22}>
+                            <OrderItem onChange={(payload) => handleItemChange(item.id, payload)} data={item} />
+                            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <StockBadge stockInfo={stockInfo} />
+                                {isInvalid && <span style={{ color: '#ff4d4f', fontSize: '12px' }}><ExclamationCircleOutlined /> Please reduce quantity or remove item</span>}
+                            </div>
+                        </Col>
+                        <Col xs={2} sm={2} md={2} lg={1} className={style.deleteBtn} onClick={() => handleDelete(item.id)}><i className="fi fi-br-cross-small"></i></Col>
+                    </Row>
+                )})}
             </div>
         </Col>
         {(load && !page.isEnd) && <Col span={24}>
@@ -205,12 +228,13 @@ function UserCart() {
         <Col span={24} md={{ span: 10 }} lg={{ span: 9 }}>
             <Card title="Summary" className={style.summaryCard}>
                 <h4 className={style.summaryValue}><Currency value={selectedItems.reduce((pre, item) => {
-                    return pre + item.qty * item.productItem.price;
+                    const safeQty = Math.max(1, item.qty || 1);
+                    return pre + safeQty * item.productItem.price;
                 }, 0)} /></h4>
                 <Button 
                     type="primary"
                     block
-                    disabled={selectedItems.length === 0}
+                    disabled={selectedItems.length === 0 || hasOutOfStock(selectedItems)}
                     onClick={() => {
                         navigate("/checkout", {
                             state: {

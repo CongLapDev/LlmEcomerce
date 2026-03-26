@@ -20,6 +20,10 @@ public class ProductItem {
     @Column(name = "id", nullable = false)
     private Integer id;
 
+    @Column(name = "sku", unique = true, length = 100)
+    @NotNull(message = "SKU is required", groups = ProductItemValidation.onCreate.class)
+    private String sku;
+
     @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.MERGE)
     @JoinColumn(name = "product_id")
     @JsonIgnoreProperties({"productItems","hibernateLazyInitializer", "handler"})

@@ -74,17 +74,36 @@ public class WarehouseController {
     }
     @PreAuthorize("hasAuthority('ADMIN')")
     @RequestMapping(value = "/{warehouse_id}/importXLSX",method = RequestMethod.POST,consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Collection<WarehouseItem> importGoods(@RequestPart(name = "file") MultipartFile file) throws IOException {
-        return wareHouseItemService.importGoods(WarehouseItemXLSX.read(file.getInputStream()));
+    public org.springframework.http.ResponseEntity<?> importGoods(@PathVariable(name = "warehouse_id") Integer warehouseId, @RequestPart(name = "file") MultipartFile file) throws IOException {
+        java.util.List<String> errors = new java.util.ArrayList<>();
+        java.util.List<com.nhs.individual.dto.WarehouseItemImportDto> parsedItems = WarehouseItemXLSX.read(file.getInputStream(), warehouseId, errors);
+        
+        Collection<WarehouseItem> savedItems = new java.util.ArrayList<>();
+        if (!parsedItems.isEmpty()) {
+            savedItems = wareHouseItemService.importGoodsBySku(parsedItems, errors);
+        }
+        
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("imported", savedItems);
+        response.put("errors", errors);
+        response.put("message", errors.isEmpty() ? "Import successful" : "Import completed with " + errors.size() + " errors/notices.");
+        
+        return org.springframework.http.ResponseEntity.ok(response);
     }
-    @RequestMapping(value = "/importXLSX/sample")
-    public void downloadSampleImportXlsx(HttpServletResponse response) throws IOException {
+
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @RequestMapping(value = "/template", method = RequestMethod.GET)
+    public void downloadWarehouseImportTemplate(HttpServletResponse response) throws IOException {
         String headerKey = "Content-Disposition";
-        String headerValue = "attachment; filename=sample.xlsx";
+        String headerValue = "attachment; filename=warehouse_sku_template.xlsx";
         response.setHeader(headerKey, headerValue);
-        try (InputStream fileInputStream = this.getClass().getResourceAsStream("/warehouseImportSample.xlsx")) {
-            assert fileInputStream != null;
-            fileInputStream.transferTo(response.getOutputStream());
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        
+        java.util.Collection<com.nhs.individual.domain.ProductItem> availableProducts = productService.findAllProductItems();
+        
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook = com.nhs.individual.workbook.WarehouseTemplateXLSX.generate(availableProducts)) {
+            workbook.write(response.getOutputStream());
+            response.flushBuffer();
         }
     }
     //Product Item In warehouse

@@ -2,6 +2,7 @@ package com.nhs.individual.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.nhs.individual.exception.InsufficientStockException;
 import com.nhs.individual.constant.OrderStatus;
 import com.nhs.individual.constant.PaymentStatus;
 import com.nhs.individual.constant.WarehouseStatus;
@@ -51,6 +52,9 @@ public class ShopOrderService {
     WareHouseRepository wareHouseRepository;
     @Autowired
     AuthService authService;
+    @Autowired
+    ShopOrderStatusService shopOrderStatusService;
+
     public Optional<ShopOrder> findById(Integer id){
         return orderRepository.findById(id);
     }
@@ -177,6 +181,80 @@ public class ShopOrderService {
         return orderRepository.findAllByUser_Id(userId,pageable);
     }
 
+    /**
+     * Cancels an order, updates its status safely, and restores the locked stock.
+     */
+    @Transactional
+    public ShopOrderStatus cancelOrder(Integer orderId, String note, String detail) {
+        log.info("========== Cancelling Order and Restoring Stock ==========");
+        
+        // 1. Cancel the order status 
+        // Handles state machine checks + throws if transition is invalid (prevents double cancel)
+        ShopOrderStatus updatedStatus = shopOrderStatusService.cancelOrder(orderId, note, detail);
+        
+        ShopOrder order = updatedStatus.getOrder();
+        if (order.getOrderLines() == null || order.getOrderLines().isEmpty()) {
+            log.warn("Order {} has no lines, skipping stock restoration", orderId);
+            return updatedStatus;
+        }
+
+        // 2. Accumulate required restorations per product item
+        Map<Integer, Integer> restorationByProductItem = new HashMap<>();
+        for (OrderLine line : order.getOrderLines()) {
+            if (line.getProductItem() != null && line.getProductItem().getId() != null && line.getQty() != null && line.getQty() > 0) {
+                restorationByProductItem.merge(line.getProductItem().getId(), line.getQty(), Integer::sum);
+            }
+        }
+
+        // 3. Process restoration with pessimistic lock
+        for (Map.Entry<Integer, Integer> entry : restorationByProductItem.entrySet()) {
+            Integer productItemId = entry.getKey();
+            Integer restoredQty = entry.getValue();
+
+            // PESSIMISTIC_WRITE lock all rows for this product item
+            List<WarehouseItem> stocks = warehouseItemRepository.findAllStockForUpdate(productItemId);
+            
+            if (stocks.isEmpty()) {
+                log.error("CRITICAL: Cannot restore stock for product item {}, no warehouse items exist!", productItemId);
+                continue;
+            }
+
+            // Restore all quantity to the first warehouse that has this product
+            WarehouseItem targetStock = stocks.get(0);
+            int currentQty = nonNull(targetStock.getQty());
+            targetStock.setQty(currentQty + restoredQty);
+            
+            log.info("Restoring {} units to product item {} at warehouse {}", restoredQty, productItemId, targetStock.getWarehouse().getId());
+            
+            warehouseItemRepository.saveAll(stocks);
+
+            // Re-evaluate product availability
+            Integer remainingTotal = nonNull(warehouseItemRepository.sumQuantityByProductItemId(productItemId));
+            Integer productId = null;
+            if (targetStock.getProductItem() != null) {
+                if (targetStock.getProductItem().getProductId() != null) {
+                    productId = targetStock.getProductItem().getProductId();
+                } else if (targetStock.getProductItem().getProduct() != null) {
+                    productId = targetStock.getProductItem().getProduct().getId();
+                }
+            }
+            
+            if (productId != null) {
+                if (remainingTotal > 0) {
+                    productRepository.updateProductStatus(productId, "AVAILABLE");
+                }
+            }
+
+            // Refresh warehouse full/operational state
+            if (targetStock.getWarehouse() != null && targetStock.getWarehouse().getId() != null) {
+                refreshWarehouseStatusAfterDeduction(targetStock.getWarehouse().getId());
+            }
+        }
+
+        log.info("========== Order {} Cancelled Successfully ==========", orderId);
+        return updatedStatus;
+    }
+
     private void deductStockForOrder(ShopOrder order) {
         if (order.getOrderLines() == null || order.getOrderLines().isEmpty()) {
             throw new IllegalArgumentException("Order must contain at least one item");
@@ -200,13 +278,12 @@ public class ShopOrderService {
 
             Integer totalAvailable = nonNull(warehouseItemRepository.sumQuantityByProductItemId(productItemId));
             if (totalAvailable < requiredQty) {
-                throw new IllegalArgumentException(
-                        "Out of Stock: product_item_id=" + productItemId +
-                                " requires " + requiredQty + " but only " + totalAvailable + " available"
-                );
+                throw new InsufficientStockException(productItemId, requiredQty, totalAvailable);
             }
 
-            List<WarehouseItem> stocks = warehouseItemRepository.findAvailableStockByProductItemId(productItemId);
+            // Acquire pessimistic write lock — prevents concurrent checkout from
+            // reading the same rows until this transaction commits or rolls back.
+            List<WarehouseItem> stocks = warehouseItemRepository.findAvailableStockForUpdate(productItemId);
             int remaining = requiredQty;
             Set<Integer> affectedWarehouseIds = new HashSet<>();
 
@@ -229,9 +306,7 @@ public class ShopOrderService {
             }
 
             if (remaining > 0) {
-                throw new IllegalArgumentException(
-                        "Out of Stock: unable to deduct enough quantity for product_item_id=" + productItemId
-                );
+                throw new InsufficientStockException(productItemId, requiredQty, requiredQty - remaining);
             }
 
             warehouseItemRepository.saveAll(stocks);

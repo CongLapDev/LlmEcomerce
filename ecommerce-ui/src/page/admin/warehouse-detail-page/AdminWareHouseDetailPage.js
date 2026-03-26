@@ -72,7 +72,7 @@ function AdminWareHouseDetailPage() {
     }
 
     function handleDownloadSample() {
-        APIBase.get('/api/v1/warehouse/importXLSX/sample', {
+        APIBase.get('/api/v1/warehouse/template', {
             responseType: 'blob' // Important: Get binary data
         })
             .then(response => {
@@ -87,7 +87,7 @@ function AdminWareHouseDetailPage() {
                 // Create a temporary anchor element and trigger download
                 const link = document.createElement('a');
                 link.href = url;
-                link.setAttribute('download', 'warehouse_import_sample.xlsx');
+                link.setAttribute('download', 'warehouse_sku_template.xlsx');
                 document.body.appendChild(link);
                 link.click();
                 
@@ -95,7 +95,7 @@ function AdminWareHouseDetailPage() {
                 link.parentNode.removeChild(link);
                 window.URL.revokeObjectURL(url);
                 
-                globalContext.message.success("Sample file downloaded successfully");
+                globalContext.message.success("Template file downloaded successfully");
             })
             .catch(e => {
                 console.error("Download error:", e);

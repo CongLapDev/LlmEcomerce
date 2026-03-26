@@ -175,4 +175,11 @@ public class ProductService {
                 .sum();
     }
 
+    @Autowired
+    private com.nhs.individual.repository.ProductItemRepository productItemRepository;
+
+    public List<com.nhs.individual.domain.ProductItem> findAllProductItems() {
+        return productItemRepository.findAll();
+    }
+
 }
