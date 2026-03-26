@@ -29,6 +29,8 @@ public class WarehouseItemXLSX {
             XSSFSheet sheet = workbook.getSheetAt(0);
             Iterator<Row> rows = sheet.iterator();
 
+            int idColIdx = -1;
+            int nameColIdx = -1;
             int skuColIdx = -1;
             int qtyColIdx = -1;
 
@@ -37,14 +39,20 @@ public class WarehouseItemXLSX {
                 for (Cell cell : headerRow) {
                     if (cell.getCellType() == org.apache.poi.ss.usermodel.CellType.STRING) {
                         String headerValue = cell.getStringCellValue().trim().toUpperCase();
+                        if ("PRODUCT_ITEM_ID".equals(headerValue)) idColIdx = cell.getColumnIndex();
+                        if ("PRODUCT_NAME".equals(headerValue)) nameColIdx = cell.getColumnIndex();
                         if ("SKU".equals(headerValue)) skuColIdx = cell.getColumnIndex();
                         if ("QUANTITY".equals(headerValue)) qtyColIdx = cell.getColumnIndex();
                     }
                 }
             }
 
-            if (skuColIdx == -1 || qtyColIdx == -1) {
-                errors.add("Missing required headers in Excel. Expected exactly 'SKU' and 'QUANTITY'.");
+            if (qtyColIdx == -1) {
+                errors.add("Missing required header in Excel. Expected 'QUANTITY'.");
+                return importDtos;
+            }
+            if (idColIdx == -1 && nameColIdx == -1 && skuColIdx == -1) {
+                errors.add("Missing identifier headers. Expected at least 'PRODUCT_ITEM_ID' or 'PRODUCT_NAME'.");
                 return importDtos;
             }
 
@@ -53,27 +61,59 @@ public class WarehouseItemXLSX {
 
                 try {
                     // Skip completely empty trailing rows
-                    if (row.getCell(skuColIdx) == null && row.getCell(qtyColIdx) == null) {
+                    if ((idColIdx == -1 || row.getCell(idColIdx) == null) &&
+                        (nameColIdx == -1 || row.getCell(nameColIdx) == null) &&
+                        (skuColIdx == -1 || row.getCell(skuColIdx) == null) && 
+                        (row.getCell(qtyColIdx) == null)) {
                         continue;
                     }
 
-                    if (row.getCell(skuColIdx) == null || row.getCell(qtyColIdx) == null) {
-                        String errMsg = "Row " + (row.getRowNum() + 1) + ": Missing required cells (SKU or Qty)";
+                    if (row.getCell(qtyColIdx) == null) {
+                        String errMsg = "Row " + (row.getRowNum() + 1) + ": Missing required column QUANTITY";
                         log.warn(errMsg);
                         errors.add(errMsg);
                         continue;
                     }
 
-                    String sku;
-                    // Handle numeric SKUs if Excel auto-formats them as numbers
-                    if (row.getCell(skuColIdx).getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC) {
-                        sku = String.valueOf((long) row.getCell(skuColIdx).getNumericCellValue());
-                    } else {
-                        sku = row.getCell(skuColIdx).getStringCellValue();
+                    Integer productId = null;
+                    if (idColIdx != -1 && row.getCell(idColIdx) != null) {
+                        if (row.getCell(idColIdx).getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+                            productId = (int) row.getCell(idColIdx).getNumericCellValue();
+                        } else if (row.getCell(idColIdx).getCellType() == org.apache.poi.ss.usermodel.CellType.STRING) {
+                            try {
+                                productId = Integer.parseInt(row.getCell(idColIdx).getStringCellValue().trim());
+                            } catch (NumberFormatException ignored) {}
+                        }
                     }
 
-                    if (sku == null || sku.trim().isEmpty()) {
-                        String errMsg = "Row " + (row.getRowNum() + 1) + ": SKU cannot be empty";
+                    String productName = null;
+                    if (nameColIdx != -1 && row.getCell(nameColIdx) != null) {
+                        if (row.getCell(nameColIdx).getCellType() == org.apache.poi.ss.usermodel.CellType.STRING) {
+                            productName = row.getCell(nameColIdx).getStringCellValue();
+                        } else if (row.getCell(nameColIdx).getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+                             productName = String.valueOf((long) row.getCell(nameColIdx).getNumericCellValue());
+                        }
+                    }
+
+                    if (productName != null) {
+                        // Normalize the string
+                        productName = java.text.Normalizer.normalize(productName, java.text.Normalizer.Form.NFD);
+                        productName = productName.replaceAll("\\p{M}", ""); // remove accents
+                        productName = productName.trim().toLowerCase().replaceAll("\\s+", " ");
+                    }
+
+                    String sku = null;
+                    if (skuColIdx != -1 && row.getCell(skuColIdx) != null) {
+                        if (row.getCell(skuColIdx).getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+                            sku = String.valueOf((long) row.getCell(skuColIdx).getNumericCellValue());
+                        } else {
+                            sku = row.getCell(skuColIdx).getStringCellValue();
+                        }
+                    }
+                    if (sku != null) sku = sku.trim();
+
+                    if (productId == null && (productName == null || productName.isEmpty()) && (sku == null || sku.isEmpty())) {
+                        String errMsg = "Row " + (row.getRowNum() + 1) + ": Missing identifier (ID, Name, or SKU)";
                         log.warn(errMsg);
                         errors.add(errMsg);
                         continue;
@@ -82,13 +122,18 @@ public class WarehouseItemXLSX {
                     Integer qty = (int) row.getCell(qtyColIdx).getNumericCellValue();
 
                     if (qty < 0) {
-                        String errMsg = "Row " + (row.getRowNum() + 1) + ": Quantity cannot be negative for SKU " + sku;
+                        String errMsg = "Row " + (row.getRowNum() + 1) + ": Quantity cannot be negative";
                         log.warn(errMsg);
                         errors.add(errMsg);
                         continue;
                     }
 
-                    com.nhs.individual.dto.WarehouseItemImportDto dto = new com.nhs.individual.dto.WarehouseItemImportDto(pathWarehouseId, sku.trim(), qty);
+                    com.nhs.individual.dto.WarehouseItemImportDto dto = new com.nhs.individual.dto.WarehouseItemImportDto();
+                    dto.setWarehouseId(pathWarehouseId);
+                    dto.setProductItemId(productId);
+                    dto.setProductName(productName);
+                    dto.setSku(sku);
+                    dto.setQty(qty);
                     importDtos.add(dto);
 
                 } catch (IllegalStateException | NumberFormatException e) {

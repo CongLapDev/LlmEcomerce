@@ -56,64 +56,131 @@ public class WareHouseItemService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(WareHouseItemService.class);
 
     @Transactional
-    public List<WarehouseItem> importGoodsBySku(List<com.nhs.individual.dto.WarehouseItemImportDto> importDtos, List<String> errors) {
+    public List<WarehouseItem> importGoodsByNameAndId(List<com.nhs.individual.dto.WarehouseItemImportDto> importDtos, List<String> errors) {
         java.util.List<WarehouseItem> savedItems = new java.util.ArrayList<>();
         
         log.info("Starting warehouse import process for {} items", importDtos.size());
+
+        // Fetch all product items for O(1) lookup
+        List<ProductItem> allItems = productItemRepository.findAll();
+        java.util.Map<Integer, ProductItem> idMap = new java.util.HashMap<>();
+        java.util.Map<String, java.util.List<ProductItem>> nameMap = new java.util.HashMap<>();
+        java.util.Map<String, ProductItem> skuMap = new java.util.HashMap<>();
+
+        for (ProductItem pi : allItems) {
+            idMap.put(pi.getId(), pi);
+            if (pi.getSku() != null && !pi.getSku().isBlank()) {
+                skuMap.put(pi.getSku().trim(), pi);
+            }
+            // Generate product name for fallback match
+            String name = pi.getProduct() != null ? pi.getProduct().getName() : "Unknown Product";
+            if (pi.getOptions() != null && !pi.getOptions().isEmpty()) {
+                String variant = String.join(", ", pi.getOptions().stream()
+                        .map(opt -> opt.getVariation().getName() + ": " + opt.getValue())
+                        .toList());
+                name += " (" + variant + ")";
+            }
+            // Normalize name exactly like the Excel parser
+            name = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD);
+            name = name.replaceAll("\\p{M}", "");
+            name = name.trim().toLowerCase().replaceAll("\\s+", " ");
+            
+            nameMap.computeIfAbsent(name, k -> new java.util.ArrayList<>()).add(pi);
+        }
         
         for (int i = 0; i < importDtos.size(); i++) {
             com.nhs.individual.dto.WarehouseItemImportDto dto = importDtos.get(i);
             int rowNumber = i + 2; // Approximate Excel row number
 
-            log.info("Processing row {}: SKU='{}', Qty={}", rowNumber, dto.getSku(), dto.getQty());
+            log.info("Processing row {}: ID='{}', Name='{}', SKU='{}', Qty={}", 
+                rowNumber, dto.getProductItemId(), dto.getProductName(), dto.getSku(), dto.getQty());
 
             try {
                 // 1. Basic Quantity Validation
                 if (dto.getQty() == null || dto.getQty() < 0) {
-                    errors.add("Row " + rowNumber + ": Invalid quantity (" + dto.getQty() + ") for SKU '" + dto.getSku() + "'");
+                    errors.add("Row " + rowNumber + ": Invalid quantity (" + dto.getQty() + ")");
                     continue;
                 }
 
-                // 2. Discover ProductItem by SKU Map
-                Optional<ProductItem> productItemOpt = productItemRepository.findBySku(dto.getSku());
-                if (productItemOpt.isEmpty()) {
-                    log.warn("Row {}: SKU '{}' not found. Skipping.", rowNumber, dto.getSku());
-                    errors.add("Row " + rowNumber + ": SKU '" + dto.getSku() + "' not found in system");
-                    continue; // Correctly skip invalid row
+                ProductItem productItem = null;
+
+                // 2. Discover ProductItem by Priority: ID > Name > SKU
+                if (dto.getProductItemId() != null) {
+                    productItem = idMap.get(dto.getProductItemId());
+                    if (productItem == null) {
+                        String errMsg = "Row " + rowNumber + ": Product Item ID '" + dto.getProductItemId() + "' not found in system";
+                        log.warn(errMsg);
+                        errors.add(errMsg);
+                        continue;
+                    }
+                } else if (dto.getProductName() != null && !dto.getProductName().isEmpty()) {
+                    java.util.List<ProductItem> matches = nameMap.get(dto.getProductName());
+                    if (matches == null || matches.isEmpty()) {
+                        String errMsg = "Row " + rowNumber + ": Product Name '" + dto.getProductName() + "' not found in system";
+                        log.warn(errMsg);
+                        errors.add(errMsg);
+                        continue;
+                    } else if (matches.size() > 1) {
+                        String errMsg = "Row " + rowNumber + ": Ambiguous product name '" + dto.getProductName() + "' matched multiple variants. Please provide PRODUCT_ITEM_ID instead.";
+                        log.warn(errMsg);
+                        errors.add(errMsg);
+                        continue;
+                    }
+                    productItem = matches.get(0);
+                } else if (dto.getSku() != null && !dto.getSku().isEmpty() && skuMap.containsKey(dto.getSku())) {
+                    // Fallback to SKU if ID and Name are missing but SKU is provided
+                    productItem = skuMap.get(dto.getSku());
+                } else {
+                    String errMsg = "Row " + rowNumber + ": Missing identifier. Provide PRODUCT_ITEM_ID, PRODUCT_NAME, or SKU.";
+                    log.warn(errMsg);
+                    errors.add(errMsg);
+                    continue;
                 }
-                ProductItem productItem = productItemOpt.get();
+
+                // Auto-fill SKU internally for logs just in case
+                if (productItem.getSku() != null) {
+                    dto.setSku(productItem.getSku());
+                }
 
                 // 3. Prevent detached composite key override - query existing DB
                 ProductItemInWarehouseId id = new ProductItemInWarehouseId(productItem.getId(), dto.getWarehouseId());
                 
-                WarehouseItem warehouseItem = repository.findById(id).orElseGet(() -> {
-                    log.info("Row {}: Constructing NEW WarehouseItem mapping for SKU '{}'", rowNumber, dto.getSku());
-                    WarehouseItem newItem = new WarehouseItem();
-                    newItem.setId(id);
+                Optional<WarehouseItem> existingItemOpt = repository.findById(id);
+                WarehouseItem warehouseItem;
+                
+                if (existingItemOpt.isPresent()) {
+                    warehouseItem = existingItemOpt.get();
+                } else {
+                    log.info("Row {}: Constructing NEW WarehouseItem mapping for variant ID '{}'", rowNumber, productItem.getId());
+                    warehouseItem = new WarehouseItem();
+                    warehouseItem.setId(id);
                     
                     Warehouse warehouse = new Warehouse();
                     warehouse.setId(dto.getWarehouseId());
                     
-                    newItem.setWarehouse(warehouse);
-                    newItem.setProductItem(productItem);
-                    newItem.setQty(0);
-                    return newItem;
-                });
+                    warehouseItem.setWarehouse(warehouse);
+                    warehouseItem.setProductItem(productItem);
+                    warehouseItem.setQty(0);
+                }
 
                 // 4. Safely handle quantities (INCREMENT!)
                 int currentQty = warehouseItem.getQty() == null ? 0 : warehouseItem.getQty();
                 warehouseItem.setQty(currentQty + dto.getQty());
 
-                // 5. Per-Row Save with Catch Block
-                WarehouseItem savedItem = repository.save(warehouseItem);
-                savedItems.add(savedItem);
+                // 5. Add to batch list instead of saving per row
+                savedItems.add(warehouseItem);
                 
-                log.info("Row {}: Successfully saved SKU '{}' - New Total Qty: {}", rowNumber, dto.getSku(), savedItem.getQty());
+                log.info("Row {}: Successfully queued item ID '{}' - New Total Qty: {}", rowNumber, productItem.getId(), warehouseItem.getQty());
                 
             } catch (Exception e) {
-                log.error("Row {}: FATAL error parsing SKU '{}': {}", rowNumber, dto.getSku(), e.getMessage(), e);
-                errors.add("Row " + rowNumber + ": System failed to save SKU '" + dto.getSku() + "'. Reason: " + e.getMessage());
+                log.error("Row {}: FATAL error processing item: {}", rowNumber, e.getMessage(), e);
+                errors.add("Row " + rowNumber + ": System failed to process item. Reason: " + e.getMessage());
             }
+        }
+        
+        // 6. Batch save all items to prevent N+1 queries
+        if (!savedItems.isEmpty()) {
+            savedItems = repository.saveAll(savedItems);
         }
         
         log.info("Import process finished. Successfully saved {}/{} variants.", savedItems.size(), importDtos.size());

@@ -34,9 +34,9 @@ public class WarehouseTemplateXLSX {
         // Create headers
         Row headerRow = sheet.createRow(0);
         
-        Cell cellSku = headerRow.createCell(0);
-        cellSku.setCellValue("SKU");
-        cellSku.setCellStyle(requiredHeaderStyle); // Make SKU stand out as essential mapping key
+        Cell cellId = headerRow.createCell(0);
+        cellId.setCellValue("PRODUCT_ITEM_ID");
+        cellId.setCellStyle(headerStyle); // Using standard header style as it's optional
 
         Cell cellName = headerRow.createCell(1);
         cellName.setCellValue("PRODUCT_NAME");
@@ -49,9 +49,6 @@ public class WarehouseTemplateXLSX {
         // Populate product rows
         int rowIdx = 1;
         for (ProductItem item : productItems) {
-            String sku = item.getSku() != null ? item.getSku() : "";
-            // If SKU is blank, it's unusable for import. Skip or still list it? 
-            // Better to show it so admins know it's missing SKUs, but we want a valid template.
             String productName = item.getProduct() != null ? item.getProduct().getName() : "Unknown Product";
             
             // Build variation suffix if options exist
@@ -63,8 +60,8 @@ public class WarehouseTemplateXLSX {
             }
 
             Row row = sheet.createRow(rowIdx++);
-            row.createCell(0).setCellValue(sku);
-            row.createCell(1).setCellValue(productName);
+            row.createCell(0).setCellValue(String.valueOf(item.getId())); // PRODUCT_ITEM_ID
+            row.createCell(1).setCellValue(productName); // PRODUCT_NAME
             // Column 2 (Quantity) intentionally left blank
         }
 

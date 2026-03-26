@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class WarehouseItemImportDto {
     private Integer warehouseId;
-    private String sku;
+    private Integer productItemId;
+    private String productName;
+    private String sku; // Retained for backwards compatibility
     private Integer qty;
 }

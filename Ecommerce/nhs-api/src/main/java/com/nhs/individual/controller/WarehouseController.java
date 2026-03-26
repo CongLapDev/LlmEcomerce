@@ -80,13 +80,23 @@ public class WarehouseController {
         
         Collection<WarehouseItem> savedItems = new java.util.ArrayList<>();
         if (!parsedItems.isEmpty()) {
-            savedItems = wareHouseItemService.importGoodsBySku(parsedItems, errors);
+            savedItems = wareHouseItemService.importGoodsByNameAndId(parsedItems, errors);
         }
         
+        int totalRows = parsedItems.size();
+        int successCount = savedItems.size();
+        int failedCount = errors.size(); // Approximate, as some errors might not belong to parsedItems rows (e.g. empty file, missing headers)
+
         java.util.Map<String, Object> response = new java.util.HashMap<>();
-        response.put("imported", savedItems);
+        response.put("totalRows", totalRows);
+        response.put("successCount", successCount);
+        response.put("failedCount", failedCount);
         response.put("errors", errors);
-        response.put("message", errors.isEmpty() ? "Import successful" : "Import completed with " + errors.size() + " errors/notices.");
+        response.put("imported", savedItems); // optional but good to keep
+
+        if (totalRows > 0 && successCount == 0) {
+            return org.springframework.http.ResponseEntity.badRequest().body(response);
+        }
         
         return org.springframework.http.ResponseEntity.ok(response);
     }
@@ -95,7 +105,7 @@ public class WarehouseController {
     @RequestMapping(value = "/template", method = RequestMethod.GET)
     public void downloadWarehouseImportTemplate(HttpServletResponse response) throws IOException {
         String headerKey = "Content-Disposition";
-        String headerValue = "attachment; filename=warehouse_sku_template.xlsx";
+        String headerValue = "attachment; filename=warehouse_import_template.xlsx";
         response.setHeader(headerKey, headerValue);
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         

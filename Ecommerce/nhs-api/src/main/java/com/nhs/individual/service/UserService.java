@@ -57,6 +57,15 @@ public class UserService {
     public User findByAccountId(Integer accountId){
         return userRepository.findByAccount_id(accountId);
     }
+    
+    @org.springframework.transaction.annotation.Transactional
+    public String updatePicture(Integer id, String picturePath) {
+        User user = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Invalid UserId"));
+        user.setPicture(picturePath);
+        userRepository.save(user);
+        return user.getPicture();
+    }
+
     public List<User> findAll(int page,int size){
         return userRepository.findAll(PageRequest.of(page, size)).getContent();
     }

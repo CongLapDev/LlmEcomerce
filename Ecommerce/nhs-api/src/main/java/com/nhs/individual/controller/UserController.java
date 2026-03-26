@@ -43,6 +43,48 @@ public class UserController {
         return userService.update(user);
     }
 
+    @RequestMapping(value = "/{id}/avatar", method = RequestMethod.POST)
+    @PreAuthorize("#id==authentication.principal.userId or hasAuthority('ROLE_ADMIN')")
+    public org.springframework.http.ResponseEntity<?> uploadAvatar(
+            @PathVariable(value = "id") Integer id, 
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            jakarta.servlet.http.HttpServletRequest request) {
+        try {
+            // 1. Validate File Size
+            if (file.getSize() > 2 * 1024 * 1024) {
+                return org.springframework.http.ResponseEntity.badRequest().body(Map.of("message", "File size exceeds 2MB limit"));
+            }
+            // 2. Validate Content Type
+            String contentType = file.getContentType();
+            if (contentType == null || (!contentType.equals("image/jpeg") && !contentType.equals("image/png"))) {
+                return org.springframework.http.ResponseEntity.badRequest().body(Map.of("message", "Only JPEG or PNG images are allowed"));
+            }
+            
+            // 3. Rename File
+            String extension = contentType.equals("image/png") ? ".png" : ".jpg";
+            String newFileName = java.util.UUID.randomUUID().toString() + extension;
+            String relativePath = "avatars/" + newFileName;
+            
+            // 4. Save to Disk
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get("uploads/avatars");
+            if (!java.nio.file.Files.exists(uploadPath)) {
+                java.nio.file.Files.createDirectories(uploadPath);
+            }
+            java.nio.file.Path filePath = uploadPath.resolve(newFileName);
+            file.transferTo(filePath.toFile());
+            
+            // 5. Update DB (relative path)
+            userService.updatePicture(id, relativePath);
+            
+            // 6. Return Full URL
+            String fullUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + "/uploads/" + relativePath;
+            return org.springframework.http.ResponseEntity.ok(Map.of("avatarUrl", fullUrl));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return org.springframework.http.ResponseEntity.internalServerError().body(Map.of("message", "Failed to upload avatar: " + e.getMessage()));
+        }
+    }
+
     @RequestMapping(method = RequestMethod.GET)
     @Secured("ADMIN")
     public Page<User> findAllUser(@CurrentUser IUserDetail userDea, @RequestParam Map<String, String> propertiesMap){
