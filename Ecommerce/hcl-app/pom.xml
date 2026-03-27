@@ -9,12 +9,12 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>nhs-app</artifactId>
+    <artifactId>hcl-app</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>com.nhs.individual</groupId>
-            <artifactId>nhs-api</artifactId>
+            <artifactId>hcl-api</artifactId>
             <version>0.0.1-SNAPSHOT</version>
         </dependency>
         <dependency>

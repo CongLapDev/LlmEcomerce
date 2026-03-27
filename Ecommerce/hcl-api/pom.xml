@@ -8,7 +8,7 @@
         <artifactId>ecommerce</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
-    <artifactId>nhs-api</artifactId>
+    <artifactId>hcl-api</artifactId>
     <packaging>jar</packaging>
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -55,7 +55,7 @@
         </dependency>
         <dependency>
             <groupId>com.nhs.individual</groupId>
-            <artifactId>nhs-payment</artifactId>
+            <artifactId>hcl-payment</artifactId>
             <version>0.0.1-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>

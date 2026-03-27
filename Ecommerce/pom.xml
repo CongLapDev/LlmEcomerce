@@ -15,9 +15,9 @@
     <name>Ecommerce</name>
     <description>Ecommerce</description>
     <modules>
-        <module>nhs-app</module>
-        <module>nhs-api</module>
-        <module>nhs-payment</module>
+        <module>hcl-app</module>
+        <module>hcl-api</module>
+        <module>hcl-payment</module>
     </modules>
     <properties>
         <java.version>17</java.version>
