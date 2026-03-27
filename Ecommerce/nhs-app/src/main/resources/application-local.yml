@@ -51,3 +51,8 @@ nhs:
     # This must match the secret used in application-common.yml
     # IMPORTANT: Use a strong, random secret key in production
     secret: "MySuperSecretJWTKeyForHS256AlgorithmMustBeAtLeast32CharactersLong123456789012345678901234567890"
+
+cloudinary:
+  cloud_name: ${CLOUDINARY_CLOUD_NAME:doggmspyo}
+  api_key: ${CLOUDINARY_API_KEY:885562666331214}
+  api_secret: ${CLOUDINARY_API_SECRET:AGo1wliD_egusVQhZPBLJGtsgpU}

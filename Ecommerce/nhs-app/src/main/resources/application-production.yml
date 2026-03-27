@@ -1,0 +1,56 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # Railway Public URL: gondola.proxy.rlwy.net:58181
+    # SPRING_DATASOURCE_URL=jdbc:mysql://gondola.proxy.rlwy.net:58181/railway?useSSL=true&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    generate-ddl: false
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+      enabled: true
+  web:
+    resources:
+      static-locations: file:uploads/
+
+server:
+  port: ${PORT:8085}
+
+file:
+  upload-dir: uploads
+
+frontend:
+  url: ${FRONTEND_URL}
+
+payment:
+  zalo:
+    app-id: ${ZALOPAY_APP_ID:2554}
+    key1: ${ZALOPAY_KEY1}
+    key2: ${ZALOPAY_KEY2}
+    endpoints:
+      create: https://sb-openapi.zalopay.vn/v2/create
+      query: https://sb-openapi.zalopay.vn/v2/query
+      refund: https://sandbox.zalopay.com.vn/v001/tpe/partialrefund
+      refund-status: https://sandbox.zalopay.com.vn/v001/tpe/getpartialrefundstatus
+    callback-url: ${APP_BASE_URL}/api/v1/purchase/zalopay/callback
+    redirect-url: ${FRONTEND_URL}/zalopay/result
+    payment-timeout-minutes: 15
+    polling-interval-seconds: 15
+    max-polling-attempts: 60
+
+nhs:
+  token:
+    accessTokenms: ${JWT_ACCESS_TOKEN_MS:3600000}
+    refreshTokenms: ${JWT_REFRESH_TOKEN_MS:7200000}
+    secret: ${JWT_SECRET}
+
+cloudinary:
+  cloud_name: ${CLOUDINARY_CLOUD_NAME}
+  api_key: ${CLOUDINARY_API_KEY}
+  api_secret: ${CLOUDINARY_API_SECRET}

@@ -7,7 +7,7 @@ import com.nhs.individual.domain.Product;
 import com.nhs.individual.domain.ProductItem;
 import com.nhs.individual.exception.ResourceNotFoundException;
 import com.nhs.individual.service.CategoryService;
-import com.nhs.individual.service.LocalFileStorageService;
+import com.nhs.individual.service.CloudinaryService;
 import com.nhs.individual.service.ProductItemService;
 import com.nhs.individual.service.ProductService;
 import com.nhs.individual.specification.DynamicSearch;
@@ -46,7 +46,7 @@ public class ProductController {
     private ProductService productService;
     private ProductItemService productItemService;
     private CategoryService categoryService;
-    private LocalFileStorageService localFileStorageService;
+    private CloudinaryService cloudinaryService;
 
     @RequestMapping(value = "/{id}", method = RequestMethod.GET)
     public Product getProductById(@PathVariable(name = "id") Integer id) {
@@ -209,9 +209,9 @@ public class ProductController {
                 System.out.println("  - Content type: " + image.getContentType());
                 System.out.println("  - Original filename: " + image.getOriginalFilename());
                 
-                String imageUrl = localFileStorageService.saveFile(image);
+                String imageUrl = cloudinaryService.upload(image);
                 
-                System.out.println("Local file upload completed!");
+                System.out.println("Cloudinary file upload completed!");
                 System.out.println("Image URL: " + imageUrl);
                 
                 if (imageUrl == null) {
@@ -313,8 +313,8 @@ public class ProductController {
                 System.out.println("  - Content type: " + image.getContentType());
                 System.out.println("  - Original filename: " + image.getOriginalFilename());
                 
-                String imageUrl = localFileStorageService.saveFile(image);
-                System.out.println("Local file upload completed!");
+                String imageUrl = cloudinaryService.upload(image);
+                System.out.println("Cloudinary file upload completed!");
                 System.out.println("Image URL: " + imageUrl);
                 
                 if (imageUrl != null) {
@@ -434,8 +434,8 @@ public class ProductController {
                 System.out.println("  - File size: " + picture.getSize() + " bytes");
                 System.out.println("  - Content type: " + picture.getContentType());
                 System.out.println("  - Original filename: " + picture.getOriginalFilename());
-                String imageUrl = localFileStorageService.saveFile(picture);
-                System.out.println("Local file upload completed!");
+                String imageUrl = cloudinaryService.upload(picture);
+                System.out.println("Cloudinary file upload completed!");
                 System.out.println("Image URL: " + imageUrl);
                 if (imageUrl != null) {
                     item.setPicture(normalizePicturePath(imageUrl));
@@ -538,8 +538,8 @@ public class ProductController {
             System.out.println("  - File size: " + picture.getSize() + " bytes");
             System.out.println("  - Content type: " + picture.getContentType());
             System.out.println("  - Original filename: " + picture.getOriginalFilename());
-            String imageUrl = localFileStorageService.saveFile(picture);
-            System.out.println("Local file upload completed!");
+            String imageUrl = cloudinaryService.upload(picture);
+            System.out.println("Cloudinary file upload completed!");
             System.out.println("Image URL: " + imageUrl);
             if (imageUrl != null) {
                 itemToUpdate.setPicture(normalizePicturePath(imageUrl));
