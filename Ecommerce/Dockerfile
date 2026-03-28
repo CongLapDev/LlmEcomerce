@@ -23,5 +23,5 @@ COPY --from=build /workspace/hcl-app/target/*.jar app.jar
 
 EXPOSE 8085
 
-# Use the production profile
-ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=production"]
+# Use the production profile with JVM optimizations for faster startup
+ENTRYPOINT ["java", "-XX:TieredStopAtLevel=1", "-Xmx384m", "-jar", "app.jar", "--spring.profiles.active=production"]

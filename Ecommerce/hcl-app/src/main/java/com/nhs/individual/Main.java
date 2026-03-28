@@ -16,6 +16,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class Main {
     public static void main(String[] args){
         SpringApplication.run(Main.class,args);
-        System.out.println("✅ Application started on port 8085");
+        System.out.println("✅ Application started successfully!");
     }
 }
