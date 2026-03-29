@@ -7,6 +7,7 @@ import com.nhs.individual.dto.AccountDto;
 import com.nhs.individual.exception.ResourceNotFoundException;
 import com.nhs.individual.secure.CurrentUser;
 import com.nhs.individual.secure.IUserDetail;
+import com.nhs.individual.service.CloudinaryService;
 import com.nhs.individual.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,8 @@ import java.util.Map;
 public class UserController {
     @Autowired
     private UserService userService;
+    @Autowired
+    private CloudinaryService cloudinaryService;
     @RequestMapping(value = "/{id}", method = RequestMethod.GET)
     public User findById(@PathVariable(value = "id") Integer id) {
         return userService.findById(id).map(user->{
@@ -60,25 +63,20 @@ public class UserController {
                 return org.springframework.http.ResponseEntity.badRequest().body(Map.of("message", "Only JPEG or PNG images are allowed"));
             }
             
-            // 3. Rename File
-            String extension = contentType.equals("image/png") ? ".png" : ".jpg";
-            String newFileName = java.util.UUID.randomUUID().toString() + extension;
-            String relativePath = "avatars/" + newFileName;
+            // 3. Upload to Cloudinary
+            System.out.println("[UserController] Uploading avatar to Cloudinary for user ID: " + id);
+            String imageUrl = cloudinaryService.upload(file, "avatars");
             
-            // 4. Save to Disk
-            java.nio.file.Path uploadPath = java.nio.file.Paths.get("uploads/avatars");
-            if (!java.nio.file.Files.exists(uploadPath)) {
-                java.nio.file.Files.createDirectories(uploadPath);
+            if (imageUrl == null) {
+                return org.springframework.http.ResponseEntity.internalServerError().body(Map.of("message", "Failed to upload avatar to Cloudinary"));
             }
-            java.nio.file.Path filePath = uploadPath.resolve(newFileName);
-            file.transferTo(filePath.toFile());
             
-            // 5. Update DB (relative path)
-            userService.updatePicture(id, relativePath);
+            // 4. Update DB (Cloudinary secure URL)
+            userService.updatePicture(id, imageUrl);
+            System.out.println("[UserController] ✓ Avatar updated successfully for user ID " + id + ": " + imageUrl);
             
-            // 6. Return Full URL
-            String fullUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + "/uploads/" + relativePath;
-            return org.springframework.http.ResponseEntity.ok(Map.of("avatarUrl", fullUrl));
+            // 5. Return Full URL
+            return org.springframework.http.ResponseEntity.ok(Map.of("avatarUrl", imageUrl));
         } catch (Exception e) {
             e.printStackTrace();
             return org.springframework.http.ResponseEntity.internalServerError().body(Map.of("message", "Failed to upload avatar: " + e.getMessage()));

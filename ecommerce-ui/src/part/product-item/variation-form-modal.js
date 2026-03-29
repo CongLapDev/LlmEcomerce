@@ -37,7 +37,7 @@ function VariationOptionSelect({ name, variations, setVariations, remove, props 
                 })
                 setVariations(variations => {
                     for (var i = 0; i < variations.length; i++) {
-                        if (variations[i].id == data.variation.id) variations[i].options = [data, ...(Array.isArray(variations[i].options) ? variations[i].options : [])];
+                        if (variations[i].id === data.variation.id) variations[i].options = [data, ...(Array.isArray(variations[i].options) ? variations[i].options : [])];
                         break;
                     }
                     return variations;
@@ -54,7 +54,7 @@ function VariationOptionSelect({ name, variations, setVariations, remove, props 
                 <Select options={variations && variations.map(variation_ => ({ label: variation_.name, value: variation_.id }))}
                     value={selectedVariation}
                     onChange={value => {
-                        setSelectedVariation(variations.find(variation_ => variation_.id == value))
+                        setSelectedVariation(variations.find(variation_ => variation_.id === value))
                         setChange(change => !change);
                     }}
                     dropdownRender={(menu) => <>

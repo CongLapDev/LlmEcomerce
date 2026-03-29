@@ -209,18 +209,18 @@ public class ProductController {
                 System.out.println("  - Content type: " + image.getContentType());
                 System.out.println("  - Original filename: " + image.getOriginalFilename());
                 
-                String imageUrl = cloudinaryService.upload(image);
+                String imageUrl = cloudinaryService.upload(image, "products");
                 
                 System.out.println("Cloudinary file upload completed!");
                 System.out.println("Image URL: " + imageUrl);
                 
                 if (imageUrl == null) {
-                    System.err.println("ERROR: Failed to save image to local storage");
-                    throw new RuntimeException("Failed to save image to local storage");
+                    System.err.println("ERROR: Failed to save image to Cloudinary");
+                    throw new RuntimeException("Failed to save image to Cloudinary");
                 }
                 
-                // Set picture URL BEFORE saving
-                product.setPicture(normalizePicturePath(imageUrl));
+                // Set picture URL directly from Cloudinary (HTTPS secure URL)
+                product.setPicture(imageUrl);
                 System.out.println("Image uploaded successfully, URL set: " + imageUrl);
             } else {
                 System.out.println("No image to upload, picture will remain null");
@@ -313,12 +313,12 @@ public class ProductController {
                 System.out.println("  - Content type: " + image.getContentType());
                 System.out.println("  - Original filename: " + image.getOriginalFilename());
                 
-                String imageUrl = cloudinaryService.upload(image);
+                String imageUrl = cloudinaryService.upload(image, "products");
                 System.out.println("Cloudinary file upload completed!");
                 System.out.println("Image URL: " + imageUrl);
                 
                 if (imageUrl != null) {
-                    product.setPicture(normalizePicturePath(imageUrl));
+                    product.setPicture(imageUrl);
                     System.out.println("Image uploaded successfully, URL set: " + imageUrl);
                 }
             } else {
@@ -434,11 +434,11 @@ public class ProductController {
                 System.out.println("  - File size: " + picture.getSize() + " bytes");
                 System.out.println("  - Content type: " + picture.getContentType());
                 System.out.println("  - Original filename: " + picture.getOriginalFilename());
-                String imageUrl = cloudinaryService.upload(picture);
+                String imageUrl = cloudinaryService.upload(picture, "products");
                 System.out.println("Cloudinary file upload completed!");
                 System.out.println("Image URL: " + imageUrl);
                 if (imageUrl != null) {
-                    item.setPicture(normalizePicturePath(imageUrl));
+                    item.setPicture(imageUrl);
                     System.out.println("Image uploaded successfully, URL set: " + imageUrl);
                 }
             } else {
@@ -538,11 +538,11 @@ public class ProductController {
             System.out.println("  - File size: " + picture.getSize() + " bytes");
             System.out.println("  - Content type: " + picture.getContentType());
             System.out.println("  - Original filename: " + picture.getOriginalFilename());
-            String imageUrl = cloudinaryService.upload(picture);
+            String imageUrl = cloudinaryService.upload(picture, "products");
             System.out.println("Cloudinary file upload completed!");
             System.out.println("Image URL: " + imageUrl);
             if (imageUrl != null) {
-                itemToUpdate.setPicture(normalizePicturePath(imageUrl));
+                itemToUpdate.setPicture(imageUrl);
                 System.out.println("Image uploaded successfully, URL set: " + imageUrl);
             }
         } else {
@@ -577,24 +577,4 @@ public class ProductController {
         return productService.findAllByWarehouseId(warehouseId);
     }
 
-    private String normalizePicturePath(String imageUrl) {
-        if (imageUrl == null || imageUrl.trim().isEmpty()) {
-            return imageUrl;
-        }
-
-        String normalized = imageUrl.replace("\\", "/").trim();
-        if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
-            return normalized;
-        }
-        if (normalized.contains("/uploads/")) {
-            return normalized.substring(normalized.indexOf("/uploads/"));
-        }
-        if (normalized.startsWith("uploads/")) {
-            return "/" + normalized;
-        }
-        if (normalized.startsWith("/")) {
-            return normalized;
-        }
-        return "/uploads/" + normalized;
-    }
 }

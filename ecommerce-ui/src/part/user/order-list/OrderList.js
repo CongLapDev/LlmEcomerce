@@ -38,7 +38,6 @@ function OrderList({ state, user }) {
                 const nextPage = isEnd ? targetPage : targetPage + 1;
                 const next = { index: nextPage, isEnd, loaded: false };
                 pageRef.current = next;
-                setPage(next);
             })
             .catch(console.log)
             .finally(() => {
@@ -67,7 +66,6 @@ function OrderList({ state, user }) {
         loadingRef.current = false;
         const resetPage = { index: 0, isEnd: false, loaded: false };
         pageRef.current = resetPage;
-        setPage(resetPage);
         setData([]);
         setLoad(true);
         window.scrollTo({ top: 0, behavior: 'auto' });

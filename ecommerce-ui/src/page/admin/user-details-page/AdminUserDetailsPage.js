@@ -95,9 +95,9 @@ function AdminUserDetailPage() {
                             {formatDate(data.dateOfBirth)}
                         </LinkListItem>
                         <Row style={{ paddingTop: "16px" }} gutter={[16, 16]}>
-                            {data.account.status != 2 && <Col span={12}><Button onClick={() => changeStatus("INACTIVE")} type="primary" danger block>Inactive</Button></Col>}
-                            {data.account.status != 3 && <Col span={12}><Button style={{ backgroundColor: "orange" }} onClick={() => changeStatus("LOCK")} type="primary" block>Lock</Button></Col>}
-                            {data.account.status != 1 && <Col span={12}><Button onClick={() => changeStatus("ACTIVE")} type="primary" block>Active</Button></Col>}
+                            {data.account.status !== 2 && <Col span={12}><Button onClick={() => changeStatus("INACTIVE")} type="primary" danger block>Inactive</Button></Col>}
+                            {data.account.status !== 3 && <Col span={12}><Button style={{ backgroundColor: "orange" }} onClick={() => changeStatus("LOCK")} type="primary" block>Lock</Button></Col>}
+                            {data.account.status !== 1 && <Col span={12}><Button onClick={() => changeStatus("ACTIVE")} type="primary" block>Active</Button></Col>}
                         </Row>
                     </Card>
                 </Col>

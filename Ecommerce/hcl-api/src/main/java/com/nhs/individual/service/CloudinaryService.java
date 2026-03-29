@@ -34,11 +34,20 @@ public class CloudinaryService {
         cloudinary = new Cloudinary(config);
     }
 
-    public String upload(MultipartFile file) {
+    public String upload(MultipartFile file, String folder) {
         try {
-            Map uploadResult = cloudinary.uploader().upload(file.getBytes(), Map.of());
-            return uploadResult.get("secure_url").toString();
+            Map<String, Object> options = new HashMap<>();
+            if (folder != null && !folder.trim().isEmpty()) {
+                options.put("folder", folder);
+            }
+            
+            System.out.println("[CloudinaryService] Uploading file to folder: " + (folder != null ? folder : "root"));
+            Map uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
+            String secureUrl = uploadResult.get("secure_url").toString();
+            System.out.println("[CloudinaryService] ✓ Upload successful: " + secureUrl);
+            return secureUrl;
         } catch (IOException e) {
+            System.err.println("[CloudinaryService] ❌ Upload failed: " + e.getMessage());
             throw new RuntimeException("Error mapping Cloudinary upload", e);
         }
     }

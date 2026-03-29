@@ -27,7 +27,7 @@ function AdminWareHouseDetailPage() {
                 let products = data.warehouseItems.reduce((pre, currentItem) => {
                     let product = undefined;
                     for (let i = 0; i < pre.length; i++) {
-                        if (pre[i].id == currentItem.productItem.productId) {
+                        if (pre[i].id === currentItem.productItem.productId) {
                             product = pre[i];
                             break;
                         }

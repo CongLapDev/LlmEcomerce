@@ -16,7 +16,7 @@ function ProductItemView({ productItem, setData }) {
         APIBase.delete(`/api/v1/product/0/item/${id}`).then(() => {
             setData(product => {
                 for (var i = 0; i < product.productItems.length; i++) {
-                    if (product.productItems[i].id == productItem.id) {
+                    if (product.productItems[i].id === productItem.id) {
                         product.productItems.splice(i, 1)
                     }
                 }

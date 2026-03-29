@@ -18,10 +18,11 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
  * 4. hasRole(): Checks if user has specific role(s) using normalized roles
  * 
  * CRITICAL FIXES:
- * - Removed user/state from requestAuth dependencies to prevent infinite loops
- * - Added useEffect to sync local state when Redux user changes
+ * - Added user/state to requestAuth dependencies (ESLint compliant)
+ * - Implemented useRef bailout pattern (hasRequestedRef) to prevent infinite loops
+ * - Added logic to reset guard when user logout (user == null)
+ * - Removed all eslint-disable-next-line comments
  * - Fixed role() to correctly read from Redux state
- * - Ensured state updates properly after login
  */
 
 /**
@@ -51,38 +52,15 @@ function useAuth() {
      * this effect detects it and sets state to 1 (loaded), allowing RoleBaseAuthorize to work
      */
     useEffect(() => {
+        // Reset guard if user is null (handle logout case)
+        if (user == null && hasRequestedRef.current) {
+            console.log("[useAuth] Logout detected, resetting request guard");
+            hasRequestedRef.current = false;
+        }
+
         if (user && state !== 1) {
             // User exists in Redux but state is not loaded - set to loaded
-            console.log("[useAuth] ✓ Redux user detected, setting state to loaded");
-            console.log("[useAuth] User ID:", user.id);
-            console.log("[useAuth] User roles:", user?.account?.roles?.map(r => r?.name || r) || []);
-            console.log("[useAuth] Normalized roles:", user?.account?.roles?.map(r => {
-                const name = r?.name || r;
-                return (name || "").toUpperCase().replace(/^ROLE_/, "");
-            }).filter(Boolean) || []);
             setState(1);
-        } else if (!user && state === 1) {
-            // User was removed from Redux - investigate why
-            const token = window.localStorage.getItem("AUTH_TOKEN");
-            console.error("[useAuth] ❌❌❌ Redux user removed, keeping loaded state (guest)");
-            console.error("[useAuth] DEBUG: Token in localStorage:", token ? "EXISTS" : "MISSING");
-            console.error("[useAuth] DEBUG: Current path:", window.location.pathname);
-            console.error("[useAuth] DEBUG: This should NOT happen after successful login!");
-            console.error("[useAuth] DEBUG: Possible causes:");
-            console.error("[useAuth] DEBUG: 1. Redux store was reset");
-            console.error("[useAuth] DEBUG: 2. Something dispatched userSlide.actions.clear");
-            console.error("[useAuth] DEBUG: 3. Navigation caused unexpected state loss");
-            
-            // CRITICAL: If token exists but user is gone, try to restore from token
-            // This can happen if Redux state is lost but token persists
-            if (token && token.trim() !== "" && !hasRequestedRef.current) {
-                console.warn("[useAuth] ⚠ Token exists but user missing - attempting to restore from token");
-                console.warn("[useAuth] ⚠ This might be a Redux state persistence issue");
-                // Don't call requestAuth here as it might cause 401 - just log the issue
-            }
-        } else if (user && state === 1) {
-            // User exists and state is loaded - log for debugging
-            console.log("[useAuth] ✓ User exists, state is loaded, roles:", user?.account?.roles?.map(r => r?.name || r) || []);
         }
     }, [user, state]);
     
@@ -98,19 +76,20 @@ function useAuth() {
      * We read user from Redux selector, not from closure.
      */
     const requestAuth = useCallback(() => {
+        // GUARD: If already requested and user exists or state is loaded, BAIL OUT
+        // This is the core logic to prevent the infinite loop when user/state are in dependencies
+        if (hasRequestedRef.current && (user || state === 1)) {
+            return Promise.resolve(user);
+        }
+
         // Prevent concurrent requests
         if (requestAuthInProgressRef.current) {
-            console.log("[useAuth] requestAuth() already in progress, skipping");
             return Promise.resolve(user);
         }
         
-        console.log("[useAuth] ===== requestAuth() called =====");
-        console.log("[useAuth] Current Redux user:", user ? `ID ${user.id}` : "null");
-        console.log("[useAuth] Current auth state:", state, "(2=loading, 1=loaded)");
-        
         // If user already exists in Redux and state is loaded, return immediately
         if (user && state === 1) {
-            console.log("[useAuth] ✓ User already in Redux, state is loaded, returning immediately");
+            hasRequestedRef.current = true;
             return Promise.resolve(user);
         }
         
@@ -259,8 +238,7 @@ function useAuth() {
                 setState(1); // Set loaded state even on error
                 throw e; // Re-throw to allow caller to handle
             });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dispatch]); // CRITICAL: Only dispatch in dependencies, not user or state
+    }, [dispatch, user, state]); // CRITICAL: Included user and state to satisfy ESLint
     
     /**
      * Auto-fetch user on mount if token exists

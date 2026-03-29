@@ -13,7 +13,7 @@ function VariationOptionSelect({ name, variations, remove, props }) {
             <Form.Item name={[name, "variation"]} {...props}>
                 <Select
                     onChange={value => {
-                        setSelectedVariation(variations.find(variation_ => variation_.id == value))
+                        setSelectedVariation(variations.find(variation_ => variation_.id === value))
                         setChange(change => !change);
                     }}
                     options={variations && variations.map(variation_ => ({ label: variation_.name, value: variation_.id }))}
