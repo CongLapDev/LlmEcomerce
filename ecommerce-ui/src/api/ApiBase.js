@@ -1,9 +1,9 @@
 import axios from "axios";
 
-// Local backend URL (Spring Boot runs on port 8085)
-export const LOCAL_URL = process.env.REACT_APP_API_URL || "http://localhost:8085";
-// Public base URL used for OAuth redirects (Google, etc.)
-export const BaseURL = "https://gadgetsource.click";
+// Backend URL (Use Render URL in production, localhost in development)
+export const LOCAL_URL = process.env.REACT_APP_API_URL || "https://hcl-ecommerce-be.onrender.com";
+// Frontend URL (Use Vercel URL in production, localhost:3000 in development)
+export const BaseURL = process.env.REACT_APP_UI_URL || "https://hcl-ecommerce-fe.vercel.app";
 
 /**
  * Format image URL from backend response
