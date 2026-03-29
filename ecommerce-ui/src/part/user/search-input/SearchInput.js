@@ -44,7 +44,9 @@ function SearchInput() {
             }
         })
         return () => {
-            currentInput?.removeEventListener("input", fetch);
+            if (currentInput) {
+                currentInput.removeEventListener("input", fetch);
+            }
         }
     }, [])
     return (

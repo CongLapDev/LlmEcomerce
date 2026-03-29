@@ -4,11 +4,6 @@ import APIBase from '../../../api/ApiBase';
 import UserOrder from '../user-order/UserOrder';
 function OrderList({ state, user }) {
     const [data, setData] = useState([]);
-    const [page, setPage] = useState({
-        index: 0,
-        isEnd: false,
-        loaded: false
-    });
     const [load, setLoad] = useState(true);
     const loadingRef = useRef(false);
     const pageRef = useRef({ index: 0, isEnd: false, loaded: false });
@@ -44,7 +39,6 @@ function OrderList({ state, user }) {
                 const nextPage = isEnd ? targetPage : targetPage + 1;
                 const next = { index: nextPage, isEnd, loaded: false };
                 pageRef.current = next;
-                setPage(next);
             })
             .catch(console.log)
             .finally(() => {
@@ -73,7 +67,6 @@ function OrderList({ state, user }) {
         loadingRef.current = false;
         const resetPage = { index: 0, isEnd: false, loaded: false };
         pageRef.current = resetPage;
-        setPage(resetPage);
         setData([]);
         setLoad(true);
         window.scrollTo({ top: 0, behavior: 'auto' });
