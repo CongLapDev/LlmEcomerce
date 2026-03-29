@@ -4,11 +4,6 @@ import APIBase from '../../../api/ApiBase';
 import UserOrder from '../user-order/UserOrder';
 function OrderList({ state, user }) {
     const [data, setData] = useState([]);
-    const [page, setPage] = useState({
-        index: 0,
-        isEnd: false,
-        loaded: false
-    });
     const [load, setLoad] = useState(true);
     const loadingRef = useRef(false);
     const pageRef = useRef({ index: 0, isEnd: false, loaded: false });

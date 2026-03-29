@@ -29,8 +29,8 @@ import { useEffect, useRef, useMemo } from "react";
  */
 function RoleBaseAuthorize({ path, role, onFail, onSuccess, fail, children }) {
     const navigate = useNavigate();
-    // CRITICAL FIX: useAuth() returns [state, user, hasRole, requestAuth] - we need all 4 items
-    const [state, user, hasRole, requestAuth] = useAuth();
+    // CRITICAL FIX: useAuth() returns [state, user, hasRole] - we only need these 3
+    const [state, user, hasRole] = useAuth();
     const redirectExecutedRef = useRef(false); // Prevent multiple redirects
     
     // CRITICAL: Memoize authorization check to prevent calling hasRole during render when loading

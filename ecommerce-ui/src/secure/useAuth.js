@@ -259,6 +259,7 @@ function useAuth() {
                 setState(1); // Set loaded state even on error
                 throw e; // Re-throw to allow caller to handle
             });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dispatch]); // CRITICAL: Only dispatch in dependencies, not user or state
     
     /**

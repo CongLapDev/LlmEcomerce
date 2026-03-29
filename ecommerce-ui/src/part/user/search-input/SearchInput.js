@@ -7,7 +7,7 @@ import { debounce } from "lodash";
 import { Link, useNavigate } from "react-router-dom";
 import PlaceHolder from "../../../assets/image/product_placeholder.png";
 
-function SearchInput({ }) {
+function SearchInput() {
     const inputRef = useRef();
     const searchTrigger = useRef();
     const navigate = useNavigate();
@@ -36,14 +36,15 @@ function SearchInput({ }) {
             fetchProduct(e.target.value)
         }, 1000)
 
-        inputRef.current.addEventListener("input", fetch)
-        inputRef.current.addEventListener("keypress", (e) => {
+        const currentInput = inputRef.current;
+        currentInput.addEventListener("input", fetch)
+        currentInput.addEventListener("keypress", (e) => {
             if (e.key === "Enter") {
                 searchTrigger.current.click();
             }
         })
         return () => {
-            inputRef.current?.removeEventListener("input", fetch);
+            currentInput?.removeEventListener("input", fetch);
         }
     }, [])
     return (
@@ -54,7 +55,7 @@ function SearchInput({ }) {
             render={attr => (
                 <Col className={style.searchResult} style={{ maxWidth: "460px", width: "90vw", }} tabIndex={-1} {...attr}>
                     {loading && <Skeleton />}
-                    {products.content.length == 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+                    {products.content.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
                     {<div className={style.result}>
                         {products.content.map(product_ => {
                             return (<Link to={`/product?id=${product_.id}`} onClick={() => setVisible(false)} className={style.productItem} >
@@ -72,7 +73,7 @@ function SearchInput({ }) {
                                 </div>
                             </Link>)
                         })}
-                        {products.content.length != 0 && <Button type="text" block onClick={() => {
+                        {products.content.length !== 0 && <Button type="text" block onClick={() => {
                             searchTrigger.current.click()
                         }}>Show All</Button>}
                     </div>}
