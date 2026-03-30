@@ -155,16 +155,23 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Explicitly allow localhost origins for development
-        configuration.addAllowedOrigin("http://localhost:3000");
-        configuration.addAllowedOrigin("http://localhost:8085");
-        // Also allow all origins for flexibility (can be restricted in production)
-        configuration.addAllowedOriginPattern("*");
+        
+        // Production: Allow specific origins
+        // Development: Allow localhost
+        configuration.addAllowedOrigin("http://localhost:3000");      // Local dev
+        configuration.addAllowedOrigin("http://localhost:8085");      // Local backend
+        configuration.addAllowedOriginPattern("https://.*\\.vercel\\.app");  // All Vercel preview & production
+        configuration.addAllowedOriginPattern("https://hcl-ecommerce-fe\\.vercel\\.app");  // Specific production domain
+        
+        // If using custom domain in production:
+        // configuration.addAllowedOrigin("https://yourdomain.com");
+        
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         configuration.setAllowPrivateNetwork(true);
-        configuration.setExposedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
