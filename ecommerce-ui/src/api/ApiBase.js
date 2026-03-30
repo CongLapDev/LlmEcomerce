@@ -12,7 +12,7 @@ import axios from "axios";
  * Usage: All API calls use this base URL automatically via APIBase axios instance
  * Example: axios.get("/api/v1/category") → ${API_BASE_URL}/api/v1/category
  */
-export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+export const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 export const LOCAL_URL = API_BASE_URL; // Alias for backward compatibility
 
 // Frontend URL (Vercel URL in production)
@@ -33,16 +33,16 @@ if (typeof window !== "undefined") {
   console.log("[🔧 ApiBase Config] Node Env:", process.env.NODE_ENV);
   console.log("[🔧 ApiBase Config] =====================================");
 
-  // WARNING: Production must have REACT_APP_API_BASE_URL
+  // WARNING: Production must have REACT_APP_API_URL (set in Vercel)
   if (!API_BASE_URL && process.env.NODE_ENV === "production") {
     console.error(
-      "[❌ CRITICAL ERROR] REACT_APP_API_BASE_URL environment variable is NOT SET!",
+      "[❌ CRITICAL ERROR] REACT_APP_API_URL environment variable is NOT SET!",
     );
     console.error(
       "[❌ CRITICAL ERROR] All API calls will fail with 400/404 errors.",
     );
     console.error(
-      "[❌ CRITICAL ERROR] Set REACT_APP_API_BASE_URL in Vercel environment variables.",
+      "[❌ CRITICAL ERROR] Set REACT_APP_API_URL in Vercel environment variables.",
     );
   }
 }
