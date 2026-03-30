@@ -1,24 +1,50 @@
 import axios from "axios";
 
 /**
- * API Base URL Configuration
+ * API Base URL Configuration - PRODUCTION SAFE
  *
- * PRODUCTION: Set REACT_APP_API_BASE_URL in Vercel environment variables
- * DEVELOPMENT: Falls back to localhost:8085
+ * CRITICAL: MUST use environment variable REACT_APP_API_BASE_URL
+ * NO fallback to localhost - production must have explicit configuration
+ *
+ * If not set: Will be empty string and cause 400/404 errors
+ * This is intentional - forces correct environment variable setup in production
  *
  * Usage: All API calls use this base URL automatically via APIBase axios instance
+ * Example: axios.get("/api/v1/category") → ${API_BASE_URL}/api/v1/category
  */
-export const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL || "http://localhost:8085";
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
 export const LOCAL_URL = API_BASE_URL; // Alias for backward compatibility
 
-// Frontend URL (Use Vercel URL in production, localhost:3000 in development)
-export const BaseURL = process.env.REACT_APP_UI_URL || "http://localhost:3000";
+// Frontend URL (Vercel URL in production)
+export const BaseURL = process.env.REACT_APP_UI_URL || "";
 
-// Log configuration on startup (for debugging)
+// Startup validation & debugging
 if (typeof window !== "undefined") {
-  console.log("[ApiBase Config] API_BASE_URL:", API_BASE_URL);
-  console.log("[ApiBase Config] Frontend URL:", BaseURL);
+  // CRITICAL: Log API configuration for debugging
+  console.log("[🔧 ApiBase Config] =====================================");
+  console.log(
+    "[🔧 ApiBase Config] API_BASE_URL:",
+    API_BASE_URL || "❌ NOT SET (ENV VAR MISSING)",
+  );
+  console.log(
+    "[🔧 ApiBase Config] Frontend URL:",
+    BaseURL || "❌ NOT SET (ENV VAR MISSING)",
+  );
+  console.log("[🔧 ApiBase Config] Node Env:", process.env.NODE_ENV);
+  console.log("[🔧 ApiBase Config] =====================================");
+
+  // WARNING: Production must have REACT_APP_API_BASE_URL
+  if (!API_BASE_URL && process.env.NODE_ENV === "production") {
+    console.error(
+      "[❌ CRITICAL ERROR] REACT_APP_API_BASE_URL environment variable is NOT SET!",
+    );
+    console.error(
+      "[❌ CRITICAL ERROR] All API calls will fail with 400/404 errors.",
+    );
+    console.error(
+      "[❌ CRITICAL ERROR] Set REACT_APP_API_BASE_URL in Vercel environment variables.",
+    );
+  }
 }
 
 /**
