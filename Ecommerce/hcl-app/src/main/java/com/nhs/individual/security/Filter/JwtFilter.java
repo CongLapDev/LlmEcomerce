@@ -33,14 +33,48 @@ public class JwtFilter extends OncePerRequestFilter {
 
     // List of paths that should skip JWT processing (permitAll endpoints)
     private static final String[] PERMIT_ALL_PATHS = {
+            // Authentication endpoints
             "/test/", "/login", "/api/auth/login", "/register", "/refresh", "/logout",
-            "/api/v1/auth/logout", "/swagger-ui/", "/v3/api-docs/", "/oauth2/", "/auth/", "/error"
+            "/api/v1/auth/logout", 
+            
+            // OAuth2 endpoints
+            "/oauth2/",
+            
+            // Error and health
+            "/error",
+            
+            // API Documentation
+            "/swagger-ui/", "/v3/api-docs/", "/swagger-resources/", "/webjars/",
+            
+            // General auth
+            "/auth/",
+            
+            // Uploads (static files)
+            "/uploads/",
+            
+            // Actuator
+            "/actuator/",
+            
+            // PUBLIC READ APIs (no authentication required for GET)
+            "/api/v1/category",
+            "/api/v1/product",
+            "/api/v2/product",
+            "/api/v1/comment",
+            "/api/v1/stock",
     };
 
-    private boolean shouldSkipJwtProcessing(String requestPath) {
+    private boolean shouldSkipJwtProcessing(String requestPath, String httpMethod) {
         if (requestPath == null) {
             return false;
         }
+        
+        // CRITICAL: Always allow OPTIONS requests (CORS preflight)
+        if ("OPTIONS".equalsIgnoreCase(httpMethod)) {
+            log.debug("[JwtFilter] Skipping JWT for OPTIONS (CORS preflight): {}", requestPath);
+            return true;
+        }
+        
+        // Check if path is in permit list
         return Arrays.stream(PERMIT_ALL_PATHS).anyMatch(requestPath::startsWith);
     }
 
@@ -49,9 +83,10 @@ public class JwtFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
         final String requestPath = request.getRequestURI();
+        final String httpMethod = request.getMethod();
 
-        if (shouldSkipJwtProcessing(requestPath)) {
-            log.debug("[JwtFilter] Skipping JWT processing for permitAll endpoint: {}", requestPath);
+        if (shouldSkipJwtProcessing(requestPath, httpMethod)) {
+            log.debug("[JwtFilter] Skipping JWT processing for permitAll endpoint: {} {}", httpMethod, requestPath);
             filterChain.doFilter(request, response);
             return;
         }

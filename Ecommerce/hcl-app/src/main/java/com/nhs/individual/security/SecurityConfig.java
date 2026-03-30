@@ -67,43 +67,99 @@ public class SecurityConfig {
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 // Add JWT filter BEFORE authentication checks
-                // This ensures JWT tokens are processed and SecurityContext is set before Spring Security checks authentication
+                // This ensures JWT tokens are processed and SecurityContext is set before Spring Security checks auth
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(req -> {
-                    // Public endpoints - no authentication required
-                    // OAuth2 endpoints (must be public for redirect flow)
-                    req.requestMatchers("/oauth2/**").permitAll()
-                    //upload endpoints
-                    .requestMatchers("/uploads/**").permitAll()
-                            // Login endpoints
-                            .requestMatchers("/login/**").permitAll()
-                            .requestMatchers("/api/auth/login").permitAll()
-                            // Auth endpoints
-                            .requestMatchers("/auth/**").permitAll()
-                            // Error endpoints
-                            .requestMatchers("/error").permitAll()
-                            .requestMatchers("/error/**").permitAll()
-                            // Other public endpoints
-                            .requestMatchers("/register").permitAll()
-                            .requestMatchers("/refresh").permitAll()
-                            // Logout endpoints (both old and new)
-                            .requestMatchers("/logout").permitAll()
-                            .requestMatchers("/api/v1/auth/logout").permitAll()
-                            .requestMatchers("/test/**").permitAll()
-                            .requestMatchers("/swagger-ui/**").permitAll()
-                            .requestMatchers("/v3/api-docs/**").permitAll()
-                            // Public GET endpoints for products and categories
-                            .requestMatchers(HttpMethod.GET, "/api/v1/product/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/v2/product/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/v1/category/**").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/v1/comment/**").permitAll()
-                            // Stats and order endpoints explicitly require authentication (clarity)
-                            .requestMatchers("/api/v1/statistic/**").authenticated()
-                            .requestMatchers("/api/v1/order/**").authenticated()
-                            .requestMatchers("/api/v1/order-management/**").authenticated()
-                            .requestMatchers("/api/v1/orders/**").authenticated()
-                            // All other requests require authentication
-                            .anyRequest().authenticated();
+                    // ======================== CRITICAL ========================
+                    // IMPORTANT: OPTIONS requests MUST be allowed for CORS preflight
+                    // OPTIONS is sent by browser before actual request to check CORS
+                    req.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
+                    
+                    // ======================== PUBLIC ENDPOINTS (No Authentication) ========================
+                    
+                    // OAuth2 endpoints (required for OAuth flow redirects)
+                    req.requestMatchers("/oauth2/**").permitAll();
+                    
+                    // File uploads (static content)
+                    req.requestMatchers("/uploads/**").permitAll();
+                    
+                    // Authentication endpoints (login, register, refresh token)
+                    req.requestMatchers("/login/**").permitAll()
+                       .requestMatchers("/api/auth/login").permitAll()
+                       .requestMatchers("/auth/**").permitAll()
+                       .requestMatchers("/register").permitAll()
+                       .requestMatchers("/refresh").permitAll()
+                       .requestMatchers("/logout").permitAll()
+                       .requestMatchers("/api/v1/auth/logout").permitAll();
+                    
+                    // Error and health check endpoints
+                    req.requestMatchers("/error", "/error/**").permitAll()
+                       .requestMatchers("/actuator/**").permitAll()
+                       .requestMatchers("/health").permitAll();
+                    
+                    // API Documentation
+                    req.requestMatchers("/swagger-ui/**").permitAll()
+                       .requestMatchers("/v3/api-docs/**").permitAll()
+                       .requestMatchers("/swagger-resources/**").permitAll()
+                       .requestMatchers("/webjars/**").permitAll();
+                    
+                    // Test endpoints
+                    req.requestMatchers("/test/**").permitAll();
+                    
+                    // ======================== PUBLIC READ APIs (No Auth Required) ========================
+                    // CRITICAL: These are the data-fetching endpoints that frontend calls
+                    
+                    // Categories - public read access (GET only)
+                    req.requestMatchers(HttpMethod.GET, "/api/v1/category").permitAll()
+                       .requestMatchers(HttpMethod.GET, "/api/v1/category/**").permitAll();
+                    
+                    // Products - public read access (GET only)
+                    req.requestMatchers(HttpMethod.GET, "/api/v1/product").permitAll()
+                       .requestMatchers(HttpMethod.GET, "/api/v1/product/**").permitAll()
+                       .requestMatchers(HttpMethod.GET, "/api/v2/product").permitAll()
+                       .requestMatchers(HttpMethod.GET, "/api/v2/product/**").permitAll();
+                    
+                    // Comments - public read access (GET only)
+                    req.requestMatchers(HttpMethod.GET, "/api/v1/comment").permitAll()
+                       .requestMatchers(HttpMethod.GET, "/api/v1/comment/**").permitAll();
+                    
+                    // Stock - public read access (GET only, POST requires auth)
+                    req.requestMatchers(HttpMethod.GET, "/api/v1/stock").permitAll()
+                       .requestMatchers(HttpMethod.GET, "/api/v1/stock/**").permitAll();
+                    
+                    // ======================== PROTECTED ENDPOINTS (Authentication Required) ========================
+                    
+                    // User-specific endpoints require authentication
+                    req.requestMatchers("/api/v1/user/**").authenticated()
+                       .requestMatchers("/api/v1/auth/user").authenticated()
+                       .requestMatchers("/api/v1/auth/account").authenticated();
+                    
+                    // Order endpoints require authentication
+                    req.requestMatchers("/api/v1/order/**").authenticated()
+                       .requestMatchers("/api/v1/orders/**").authenticated()
+                       .requestMatchers("/api/v1/order-management/**").authenticated()
+                       .requestMatchers("/api/v1/purchase/**").authenticated();
+                    
+                    // Cart endpoints require authentication
+                    req.requestMatchers("/api/v1/cart/**").authenticated();
+                    
+                    // Payment endpoints require authentication
+                    req.requestMatchers("/api/v1/payment/**").authenticated();
+                    
+                    // Statistics endpoints require authentication
+                    req.requestMatchers("/api/v1/statistic/**").authenticated()
+                       .requestMatchers("/admin/**").authenticated();
+                    
+                    // Write operations (POST, PUT, DELETE) for products/categories require authentication
+                    req.requestMatchers(HttpMethod.POST, "/api/v1/product").authenticated()
+                       .requestMatchers(HttpMethod.PUT, "/api/v1/product/**").authenticated()
+                       .requestMatchers(HttpMethod.DELETE, "/api/v1/product/**").authenticated()
+                       .requestMatchers(HttpMethod.POST, "/api/v1/category").authenticated()
+                       .requestMatchers(HttpMethod.PUT, "/api/v1/category/**").authenticated()
+                       .requestMatchers(HttpMethod.DELETE, "/api/v1/category/**").authenticated();
+                    
+                    // All other requests require authentication
+                    req.anyRequest().authenticated();
                 })
                 .exceptionHandling(ex -> {
                     ex.authenticationEntryPoint(new RestAuthenticationEntryPoint());
@@ -156,21 +212,37 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Production: Allow specific origins
-        // Development: Allow localhost
-        configuration.addAllowedOrigin("http://localhost:3000");      // Local dev
-        configuration.addAllowedOrigin("http://localhost:8085");      // Local backend
-        configuration.addAllowedOriginPattern("https://.*\\.vercel\\.app");  // All Vercel preview & production
-        configuration.addAllowedOriginPattern("https://hcl-ecommerce-fe\\.vercel\\.app");  // Specific production domain
+        // DEVELOPMENT: Allow localhost for local testing
+        configuration.addAllowedOrigin("http://localhost:3000");      
+        configuration.addAllowedOrigin("http://localhost:8085");      
+        configuration.addAllowedOrigin("http://127.0.0.1:3000");
         
-        // If using custom domain in production:
+        // PRODUCTION: Allow Vercel domains (both preview and production)
+        // Exact production domain
+        configuration.addAllowedOrigin("https://llm-ecomerce.vercel.app");
+        configuration.addAllowedOrigin("https://hcl-ecommerce-fe.vercel.app");
+        
+        // Wildcard pattern for all Vercel preview deployments
+        configuration.addAllowedOriginPattern("https://.*\\.vercel\\.app");
+        
+        // Allow custom domains if deployed elsewhere
         // configuration.addAllowedOrigin("https://yourdomain.com");
         
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        // CRITICAL: Methods must include OPTIONS for CORS preflight
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
+        
+        // Allow all headers in requests (including Authorization)
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setMaxAge(3600L); // Cache preflight for 1 hour
+        
+        // Allow credentials (cookies, Authorization headers)
         configuration.setAllowCredentials(true);
+        
+        // Allow private network access (for localhost development)
         configuration.setAllowPrivateNetwork(true);
-        configuration.setExposedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        
+        // Expose these headers in responses so frontend can read them
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept"));
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
