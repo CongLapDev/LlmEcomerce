@@ -1,11 +1,10 @@
-import { Row, Col, Dropdown } from "antd";
+import { Row, Col } from "antd";
 import globalStyle from "../../../assets/style/base.module.scss";
 import style from "./style.module.scss";
 import clsx from "clsx";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import APIBase from "../../../api/ApiBase";
-import useDevice from "../../../hooks/useDevice";
 
 // Icon mapping for common category names
 const getCategoryIcon = (categoryName) => {
@@ -34,36 +33,17 @@ const getCategoryIcon = (categoryName) => {
 };
 
 // Transform API category data to component format
+// Only process first-level categories - do NOT include nested children
 const transformCategory = (category) => {
-  const hasChildren = category.children && category.children.length > 0;
-
   const transformed = {
-    label: category.name,
-    icon: getCategoryIcon(category.name),
-    id: category.id,
-    href: `/product/search?category=${category.id}`, // Always provide href for parent category
+    label: category?.name || "Unknown",
+    icon: getCategoryIcon(category?.name),
+    id: category?.id,
+    href: `/product/search?category=${category?.id}`,
   };
 
-  if (hasChildren) {
-    // Category has children - create dropdown menu items
-    // Add parent category as first item, then children
-    transformed.children = [
-      {
-        key: `parent-${category.id}`,
-        label: (
-          <Link to={`/product/search?category=${category.id}`}>
-            All {category.name}
-          </Link>
-        ),
-      },
-      ...category.children.map((child, index) => ({
-        key: `child-${child.id}-${index}`,
-        label: (
-          <Link to={`/product/search?category=${child.id}`}>{child.name}</Link>
-        ),
-      })),
-    ];
-  }
+  // Don't process children - only display the first level
+  // Ignore any nested categories or products
 
   return transformed;
 };
@@ -71,41 +51,70 @@ const transformCategory = (category) => {
 function CategoryBar({ className }) {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const device = useDevice();
-
-  // Use click trigger on mobile/tablet, hover on desktop
-  const dropdownTrigger =
-    device === "MOBILE" || device === "TABLET" ? ["click"] : ["hover"];
 
   useEffect(() => {
-    // Fetch categories from API. Prefer root id=1, then fallback to full list.
+    // Fetch categories from API - extract only first-level categories (root.children)
     setLoading(true);
 
     const loadCategories = async () => {
       try {
+        console.log(
+          "[CategoryBar] Fetching categories from /api/v1/category/1...",
+        );
+
         const payload = await APIBase.get("/api/v1/category/1");
+        console.log("[CategoryBar] API Response:", payload?.data);
+
+        // Extract only first-level categories from root
         const rootCategory = payload?.data;
-        if (rootCategory && Array.isArray(rootCategory.children)) {
-          setCategories(rootCategory.children.map(transformCategory));
+        const categories = rootCategory?.children || [];
+
+        if (Array.isArray(categories) && categories.length > 0) {
+          console.log(
+            `[CategoryBar] Successfully loaded ${categories.length} categories:`,
+            categories.map((cat) => ({ id: cat.id, name: cat.name })),
+          );
+          setCategories(categories.map(transformCategory));
+          setLoading(false);
           return;
+        } else {
+          console.warn(
+            "[CategoryBar] No children found in root category or empty array",
+          );
         }
       } catch (err) {
-        console.warn("Root category endpoint failed, fallback to list:", err);
+        console.error(
+          "[CategoryBar] Error fetching root category:",
+          err.message,
+        );
       }
 
+      // Fallback: try fetching all categories
       try {
+        console.log(
+          "[CategoryBar] Fallback: Fetching all categories from /api/v1/category...",
+        );
+
         const payload = await APIBase.get("/api/v1/category");
         const list = Array.isArray(payload?.data) ? payload.data : [];
-        // Keep top-level categories only if parent info exists.
+
+        console.log(`[CategoryBar] Fallback returned ${list.length} items`);
+
+        // Keep top-level categories only (no parent)
         const topLevel = list.filter(
           (item) =>
             !item?.parent &&
             (item?.parent_id === null || item?.parent_id === undefined),
         );
-        const source = topLevel.length > 0 ? topLevel : list;
-        setCategories(source.map(transformCategory));
+
+        const categoriesToDisplay = topLevel.length > 0 ? topLevel : list;
+        console.log(
+          `[CategoryBar] Displaying ${categoriesToDisplay.length} top-level categories`,
+        );
+
+        setCategories(categoriesToDisplay.map(transformCategory));
       } catch (err) {
-        console.error("Error fetching categories:", err);
+        console.error("[CategoryBar] Error fetching categories:", err.message);
         setCategories([]);
       } finally {
         setLoading(false);
@@ -130,45 +139,24 @@ function CategoryBar({ className }) {
   return (
     <Row justify="center" className={clsx(style.container, className)}>
       <Row className={style.category}>
-        {categories.length > 0 ? (
-          categories.map((category_, key) => {
-            const hasChildren =
-              category_.children && category_.children.length > 0;
-
+        {(categories || []).length > 0 ? (
+          (categories || []).map((category_) => {
+            // Don't render nested children - only display the category itself
             return (
               <Col
-                key={category_.id || key}
+                key={category_?.id}
                 span={8}
                 md={{ span: 6 }}
                 lg={{ span: 4 }}
                 className={style.category}
               >
-                {hasChildren ? (
-                  <Dropdown
-                    menu={{ items: category_.children }}
-                    trigger={dropdownTrigger}
-                    placement="bottomLeft"
-                  >
-                    <Link
-                      to={category_.href}
-                      className={clsx(globalStyle.listItem, style.categoryItem)}
-                    >
-                      <span className={globalStyle.icon}>{category_.icon}</span>
-                      <span>{category_.label}</span>
-                      <span className={style.dropdownIndicator}>
-                        <i className="fi fi-rr-angle-small-down"></i>
-                      </span>
-                    </Link>
-                  </Dropdown>
-                ) : (
-                  <Link
-                    to={category_.href}
-                    className={clsx(globalStyle.listItem, style.categoryItem)}
-                  >
-                    <span className={globalStyle.icon}>{category_.icon}</span>
-                    <span>{category_.label}</span>
-                  </Link>
-                )}
+                <Link
+                  to={category_?.href || "#"}
+                  className={clsx(globalStyle.listItem, style.categoryItem)}
+                >
+                  <span className={globalStyle.icon}>{category_?.icon}</span>
+                  <span>{category_?.label || "Unknown"}</span>
+                </Link>
               </Col>
             );
           })
