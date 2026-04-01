@@ -5,7 +5,6 @@ import com.nhs.individual.dto.StockCheckRequest;
 import com.nhs.individual.service.StockValidationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,10 +40,9 @@ public class StockController {
 
     /**
      * Bulk stock availability check.
-     * Requires an authenticated user (any role).
+     * Public endpoint used during checkout validation.
      */
     @PostMapping("/check")
-    @PreAuthorize("isAuthenticated()")
     public List<StockAvailabilityDto> checkStock(
             @Valid @RequestBody List<@Valid StockCheckRequest> items) {
         return stockValidationService.checkBulk(items);

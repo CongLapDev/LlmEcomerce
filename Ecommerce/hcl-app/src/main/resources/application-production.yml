@@ -38,7 +38,7 @@ file:
   upload-dir: uploads
 
 frontend:
-  url: ${FRONTEND_URL}
+  url: ${FRONTEND_URL:https://llm-ecomerce.vercel.app}
 
 payment:
   zalo:
@@ -50,8 +50,8 @@ payment:
       query: https://sb-openapi.zalopay.vn/v2/query
       refund: https://sandbox.zalopay.com.vn/v001/tpe/partialrefund
       refund-status: https://sandbox.zalopay.com.vn/v001/tpe/getpartialrefundstatus
-    callback-url: ${APP_BASE_URL}/api/v1/purchase/zalopay/callback
-    redirect-url: ${FRONTEND_URL}/zalopay/result
+    callback-url: ${APP_BASE_URL:https://llmecomerce.onrender.com}/api/v1/purchase/zalopay/callback
+    redirect-url: ${FRONTEND_URL:https://llm-ecomerce.vercel.app}/zalopay/result
     payment-timeout-minutes: 15
     polling-interval-seconds: 15
     max-polling-attempts: 60
