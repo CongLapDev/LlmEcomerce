@@ -42,7 +42,7 @@ frontend:
 
 payment:
   zalo:
-    app-id: ${ZALOPAY_APP_ID:2554}
+    app-id: ${ZALOPAY_APP_ID:554}
     key1: ${ZALOPAY_KEY1}
     key2: ${ZALOPAY_KEY2}
     endpoints:

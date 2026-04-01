@@ -7,11 +7,15 @@ import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
 @Slf4j
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Getter
 @ToString
 public class OrderInfo implements Mapable {
+    private static final String SANDBOX_KEY1 = "sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn";
     //(REQUIRED) Định danh cho ứng dụng đã được cấp khi đăng ký ứng dụng với ZaloPay
     private int app_id;
     //(REQUIRED) Định danh user (Tên , id,..., có thể dùng thông tin mặc định, chằng hạn như tên ứng dụng )
@@ -71,21 +75,52 @@ public class OrderInfo implements Mapable {
         this.title = title;
         
         // Generate MAC according to ZaloPay spec: app_id|app_trans_id|app_user|amount|app_time|embed_data|item
-        String hmacInput=this.app_id+"|"+this.app_trans_id+"|"+this.app_user+"|"+this.amount+"|"+this.app_time+"|"+this.embed_data+"|"+this.item;
+        String hmacInput = buildHmacInput();
         log.debug("========== ZaloPay MAC Generation ==========");
         log.debug("  HMAC Input: {}", hmacInput);
-        
+
         if (key1 == null || key1.trim().isEmpty()) {
             log.error("❌ CRITICAL: key1 is null or empty! Cannot generate MAC.");
             throw new IllegalArgumentException("ZaloPay key1 cannot be null or empty");
         }
-        
-        log.debug("  Key1 (first 10 chars): {}...", key1.substring(0, Math.min(10, key1.length())));
-        
-        this.mac = HMACUtil.HMacHexStringEncode(HMACUtil.HMACSHA256, key1.trim(), hmacInput);
-        
+
+        String normalizedKey1 = key1.trim();
+        log.debug("  Key1 length: {}", key1.length());
+        log.debug("  Key1 trimmed length: {}", normalizedKey1.length());
+        log.debug("  Key1 bytes: {}", Arrays.toString(key1.getBytes(StandardCharsets.UTF_8)));
+        log.debug("  Key1 trimmed bytes: {}", Arrays.toString(normalizedKey1.getBytes(StandardCharsets.UTF_8)));
+        log.debug("  Key1 prefix: {}...", maskKey(normalizedKey1));
+
+        if (!SANDBOX_KEY1.equals(normalizedKey1)) {
+            log.error("❌ CRITICAL: key1 does not match expected sandbox key exactly.");
+            log.error("  Expected sandbox key prefix: {}...", maskKey(SANDBOX_KEY1));
+            throw new IllegalArgumentException("ZaloPay key1 mismatch for sandbox environment");
+        }
+
+        this.mac = HMACUtil.HMacHexStringEncode(HMACUtil.HMACSHA256, normalizedKey1, hmacInput);
+        String verifiedMac = HMACUtil.HMacHexStringEncode(HMACUtil.HMACSHA256, normalizedKey1, buildHmacInput());
+
+        if (!this.mac.equals(verifiedMac)) {
+            log.error("❌ CRITICAL: MAC verification failed inside OrderInfo.");
+            log.error("  mac1: {}", this.mac);
+            log.error("  mac2: {}", verifiedMac);
+            throw new IllegalStateException("ZaloPay MAC verification failed");
+        }
+
         log.debug("  Generated MAC (first 20 chars): {}...", this.mac != null && this.mac.length() > 20 ? this.mac.substring(0, 20) : this.mac);
         log.debug("===========================================");
+    }
+
+    private String buildHmacInput() {
+        return this.app_id + "|" + this.app_trans_id + "|" + this.app_user + "|" + this.amount + "|" + this.app_time + "|" + this.embed_data + "|" + this.item;
+    }
+
+    private String maskKey(String key) {
+        if (key == null || key.isEmpty()) {
+            return "";
+        }
+        int visible = Math.min(10, key.length());
+        return key.substring(0, visible);
     }
 
 }

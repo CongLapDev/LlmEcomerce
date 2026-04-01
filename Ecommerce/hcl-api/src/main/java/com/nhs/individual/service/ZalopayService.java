@@ -160,6 +160,8 @@ public class ZalopayService {
                     log.error("❌❌❌ FATAL: item array is empty! ZaloPay requires at least one product.");
                     return ZaloPayResponse.error(-1, "Cannot create ZaloPay payment: order must contain at least one product.");
                 }
+
+                String embedDataJson = buildEmbedDataJson();
                 
                 log.info("✓ item array built: {} items", shopOrder.getOrderLines() != null ? shopOrder.getOrderLines().size() : 0);
                 
@@ -172,7 +174,7 @@ public class ZalopayService {
                         "Payment for order #" + orderId,
                         "zalopayapp",
                         itemJson,  // Valid JSON array string with products
-                        String.format("{\"redirecturl\": \"%s\"}", zaloPayConfig.getRedirectUrl()),
+                        embedDataJson,
                         zaloPayConfig.getKey1(),
                         zaloPayConfig.getCallbackUrl(),
                         null
@@ -191,8 +193,10 @@ public class ZalopayService {
                 log.info("============================================");
                 
                 // Build request
-                Map<String, Object> mapParams = orderInfo.toMap();
+                Map<String, Object> mapParams = buildCreateOrderParams(orderInfo);
+                String rawRequestBody = buildRawRequestBody(mapParams);
                 log.debug("Request params map: {}", mapParams);
+                log.debug("Request params raw body: {}", rawRequestBody);
                 HttpPost post = new HttpPost(zaloPayConfig.getEndpoints().getCreate());
                 List<NameValuePair> params = new ArrayList<>();
                 
@@ -815,7 +819,7 @@ public class ZalopayService {
         List<Map<String, Object>> items = new ArrayList<>();
         for (com.nhs.individual.domain.OrderLine line : orderLines) {
             if (line.getProductItem() != null) {
-                Map<String, Object> item = new HashMap<>();
+                Map<String, Object> item = new LinkedHashMap<>();
                 item.put("itemid", String.valueOf(line.getProductItem().getId()));
                 item.put("itemname", line.getProductItem().getProduct() != null 
                     ? line.getProductItem().getProduct().getName() 
@@ -839,6 +843,55 @@ public class ZalopayService {
             log.error("Failed to serialize item array to JSON", e);
             return "[]";
         }
+    }
+
+    private String buildEmbedDataJson() {
+        Map<String, Object> embedData = new LinkedHashMap<>();
+        embedData.put("redirecturl", zaloPayConfig.getRedirectUrl());
+        try {
+            return com.nhs.individual.utils.JSON.stringify(embedData);
+        } catch (Exception e) {
+            log.error("Failed to serialize embed_data JSON", e);
+            return "{}";
+        }
+    }
+
+    private Map<String, Object> buildCreateOrderParams(OrderInfo orderInfo) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("app_id", orderInfo.getApp_id());
+        params.put("app_user", orderInfo.getApp_user());
+        params.put("app_trans_id", orderInfo.getApp_trans_id());
+        params.put("amount", orderInfo.getAmount());
+        params.put("app_time", orderInfo.getApp_time());
+        params.put("description", orderInfo.getDescription());
+        params.put("bank_code", orderInfo.getBank_code());
+        params.put("item", orderInfo.getItem());
+        params.put("embed_data", orderInfo.getEmbed_data());
+        params.put("callback_url", orderInfo.getCallback_url());
+        params.put("mac", orderInfo.getMac());
+        params.put("title", orderInfo.getTitle());
+        params.put("expire_duration_seconds", orderInfo.getExpire_duration_seconds());
+        params.put("device_info", orderInfo.getDevice_info());
+        params.put("sub_app_id", orderInfo.getSub_app_id());
+        params.put("currency", orderInfo.getCurrency());
+        params.put("phone", orderInfo.getPhone());
+        params.put("email", orderInfo.getEmail());
+        params.put("address", orderInfo.getAddress());
+        return params;
+    }
+
+    private String buildRawRequestBody(Map<String, Object> params) {
+        StringBuilder raw = new StringBuilder();
+        for (Map.Entry<String, Object> entry : params.entrySet()) {
+            if (entry.getValue() == null) {
+                continue;
+            }
+            if (raw.length() > 0) {
+                raw.append("&");
+            }
+            raw.append(entry.getKey()).append("=").append(entry.getValue());
+        }
+        return raw.toString();
     }
     
     /**
