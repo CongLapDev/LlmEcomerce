@@ -1,6 +1,6 @@
 import { Row, Col, Card, Typography, Button, Carousel, Avatar, Space } from "antd";
 import { ProductCardv2 } from "../../../components";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import APIBase from "../../../api/ApiBase";
 import style from "./style.module.scss";
 import useAuth from "../../../secure/useAuth";
@@ -41,48 +41,63 @@ function Home() {
         console.log("[Home] hasRole('USER'):", hasRole("USER"));
         console.log("[Home] Current path:", window.location.pathname);
     }, [authState, user, hasRole]);
-    
-    useEffect(() => {
-        console.log("[Home] Fetching products...");
-        APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8").then(payload => {
-            setNewests(payload.data);
-            console.log("[Home] Newest products loaded:", payload.data?.content?.length || 0);
-        }).catch(err => {
-            console.error("[Home] Error loading newest products:", err);
-        });
-        APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8&category=7").then(payload => {
-            setAccessories(payload.data);
-            console.log("[Home] Accessories loaded:", payload.data?.content?.length || 0);
-        }).catch(err => {
-            console.error("[Home] Error loading accessories:", err);
-        });
-        APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8&category=6").then(payload => {
-            setmonitors(payload.data);
-            console.log("[Home] Monitors loaded:", payload.data?.content?.length || 0);
-        }).catch(err => {
-            console.error("[Home] Error loading monitors:", err);
-        });
 
-        // Fetch categories for category section
-        APIBase.get("api/v1/category/1").then(payload => {
-            const rootCategory = payload.data;
-            if (rootCategory && rootCategory.children) {
-                // Get top-level categories (limit to 6 for display)
-                const topCategories = rootCategory.children.slice(0, 6).map(cat => ({
-                    id: cat.id,
-                    name: cat.name,
-                    icon: getCategoryIcon(cat.name)
-                }));
-                setCategories(topCategories);
-            }
-        }).catch(err => {
-            console.error("[Home] Error loading categories:", err);
-        });
-    }, [])
-    
     // Show welcome message if user is logged in
     const isAuthenticated = authState === 1 && user && hasRole("USER");
     const userName = user ? `${user.firstname || ""} ${user.lastname || ""}`.trim() : "";
+    
+    // Track if products have already been fetched to prevent redundant calls
+    const hasFetchedRef = useRef(false);
+    
+    useEffect(() => {
+        // BAIL OUT: If state is still loading, wait for it to settle
+        if (authState !== 1) {
+            console.log("[Home] Auth state is loading (2), waiting to fetch...");
+            return;
+        }
+
+        // BAIL OUT: Prevent multiple redundant fetches on re-render
+        if (hasFetchedRef.current) {
+            console.log("[Home] Products already fetched, skipping redundant call.");
+            return;
+        }
+
+        console.log("[Home] Fetching products (Triggered by auth state change)...");
+        
+        // Fetch all categories and product sections
+        const fetchAllData = async () => {
+            try {
+                const [newestPayload, accessoriesPayload, monitorsPayload, categoriesPayload] = await Promise.all([
+                    APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8"),
+                    APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8&category=7"),
+                    APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8&category=6"),
+                    APIBase.get("api/v1/category/1")
+                ]);
+
+                setNewests(newestPayload.data);
+                setAccessories(accessoriesPayload.data);
+                setmonitors(monitorsPayload.data);
+
+                const rootCategory = categoriesPayload.data;
+                if (rootCategory && rootCategory.children) {
+                    const topCategories = rootCategory.children.slice(0, 6).map(cat => ({
+                        id: cat.id,
+                        name: cat.name,
+                        icon: getCategoryIcon(cat.name)
+                    }));
+                    setCategories(topCategories);
+                }
+
+                console.log("[Home] All products and categories loaded successfully.");
+                hasFetchedRef.current = true; // Mark as fetched ONLY after success
+
+            } catch (err) {
+                console.error("[Home] Error loading data:", err);
+            }
+        };
+
+        fetchAllData();
+    }, [authState, isAuthenticated, user]);
     
     console.log("[Home] Render - isAuthenticated:", isAuthenticated, "userName:", userName);
 
