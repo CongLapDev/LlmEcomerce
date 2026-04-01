@@ -42,6 +42,7 @@ import java.io.InputStreamReader;
 import java.net.URISyntaxException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -190,24 +191,31 @@ public class ZalopayService {
                 log.info("  bank_code: {}", orderInfo.getBank_code());
                 log.info("  callback_url: {}", orderInfo.getCallback_url());
                 log.info("  mac (first 20 chars): {}...", orderInfo.getMac() != null ? orderInfo.getMac().substring(0, Math.min(20, orderInfo.getMac().length())) : "NULL");
+                log.info("  HMAC Input: {}", orderInfo.getHmacInput());
                 log.info("============================================");
-                
+
                 // Build request
                 Map<String, Object> mapParams = buildCreateOrderParams(orderInfo);
                 String rawRequestBody = buildRawRequestBody(mapParams);
                 log.debug("Request params map: {}", mapParams);
                 log.debug("Request params raw body: {}", rawRequestBody);
+
                 HttpPost post = new HttpPost(zaloPayConfig.getEndpoints().getCreate());
                 List<NameValuePair> params = new ArrayList<>();
-                
+
                 for (Map.Entry<String, Object> e : mapParams.entrySet()) {
                     if (e.getValue() != null) {
-                    params.add(new BasicNameValuePair(e.getKey(), e.getValue().toString()));
+                        params.add(new BasicNameValuePair(e.getKey(), e.getValue().toString()));
                     }
                 }
-                
-                post.setEntity(new UrlEncodedFormEntity(params));
-                
+
+                // CRITICAL FIX: Explicitly use UTF-8 for the request body
+                UrlEncodedFormEntity entity = new UrlEncodedFormEntity(params, StandardCharsets.UTF_8);
+                post.setEntity(entity);
+
+                // Add explicit Content-Type header with charset
+                post.setHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+
                 log.info("→ Sending create order request to ZaloPay: {}", zaloPayConfig.getEndpoints().getCreate());
                 log.debug("  Request params: {}", mapParams);
                 

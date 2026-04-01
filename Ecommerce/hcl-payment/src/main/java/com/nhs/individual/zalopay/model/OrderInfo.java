@@ -87,14 +87,11 @@ public class OrderInfo implements Mapable {
         String normalizedKey1 = key1.trim();
         log.debug("  Key1 length: {}", key1.length());
         log.debug("  Key1 trimmed length: {}", normalizedKey1.length());
-        log.debug("  Key1 bytes: {}", Arrays.toString(key1.getBytes(StandardCharsets.UTF_8)));
-        log.debug("  Key1 trimmed bytes: {}", Arrays.toString(normalizedKey1.getBytes(StandardCharsets.UTF_8)));
         log.debug("  Key1 prefix: {}...", maskKey(normalizedKey1));
 
         if (!SANDBOX_KEY1.equals(normalizedKey1)) {
-            log.error("❌ CRITICAL: key1 does not match expected sandbox key exactly.");
-            log.error("  Expected sandbox key prefix: {}...", maskKey(SANDBOX_KEY1));
-            throw new IllegalArgumentException("ZaloPay key1 mismatch for sandbox environment");
+            log.warn("⚠️ WARNING: key1 does not match the default sandbox key '{}'.", maskKey(SANDBOX_KEY1));
+            log.warn("  If you are using a custom sandbox application, this is expected.");
         }
 
         this.mac = HMACUtil.HMacHexStringEncode(HMACUtil.HMACSHA256, normalizedKey1, hmacInput);
@@ -109,6 +106,10 @@ public class OrderInfo implements Mapable {
 
         log.debug("  Generated MAC (first 20 chars): {}...", this.mac != null && this.mac.length() > 20 ? this.mac.substring(0, 20) : this.mac);
         log.debug("===========================================");
+    }
+
+    public String getHmacInput() {
+        return buildHmacInput();
     }
 
     private String buildHmacInput() {
