@@ -26,11 +26,10 @@ const getCategoryIcon = (categoryName) => {
 /**
  * Home Component - Main landing page with optimized performance
  * 
- * Optimized Version (Senior Performance Engineer Edition):
- * - Fixed multiple re-renders: useEffect now depends ONLY on authState
- * - Fixed duplicate API calls: using useRef guard (hasFetchedRef)
- * - Optimized network load: using Promise.all for parallel fetching
- * - Stable Derived State: isAuthenticated and userName are memoized
+ * Performance Refactor (Lag & 502 Fix Edition):
+ * - Removed auth-blocking: Fetching starts immediately on mount (Guest-first)
+ * - Strengthened fetch guard: hasFetchedRef set immediately to prevent 502 retry loops
+ * - Fixed lag: Removed strict authState dependency for public data
  */
 function Home() {
     const navigate = useNavigate();
@@ -40,42 +39,45 @@ function Home() {
     const [accessories, setAccessories] = useState({ content: [] });
     const [monitors, setmonitors] = useState({ content: [] });
     const [categories, setCategories] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
     
-    // FETCH GUARD: useRef prevents double-fetching even during component mount/update cycles
     const hasFetchedRef = useRef(false);
 
     /**
-     * Optimized Products & Categories Fetcher
-     * Trigger: authState transitions to Loaded (1)
-     * Reason: Once auth is settled, we know if we are a guest or a user without ambiguity
+     * Eager Products & Categories Fetcher
+     * Trigger: Initial mount.
+     * Reason: Public data (products/categories) does not need to wait for auth status.
+     * Guard: hasFetchedRef prevents redundant calls if component re-renders.
      */
     useEffect(() => {
-        // Wait for auth loading to finish
-        if (authState !== 1) return;
-
-        // Skip if already successfully fetched
+        // BAIL OUT: Prevent multiple redundant fetches
         if (hasFetchedRef.current) return;
 
-        /**
-         * Fetch everything in parallel - Single burst of network activity
-         */
+        // Set guard IMMEDIATELY to prevent overlapping requests from rapid re-renders
+        hasFetchedRef.current = true;
+        
         const fetchAllData = async () => {
+            setIsLoading(true);
             try {
-                console.log("[Home] 🚀 Single-Burst Data Initialized (authState: 1)");
+                console.log("[Home] 🚀 Eager Fetch Initialized (Parallel Batch)");
                 
+                // Fetch in parallel to avoid waterfalls
                 const [newestPayload, accessoriesPayload, monitorsPayload, categoriesPayload] = await Promise.all([
                     APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8"),
                     APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8&category=7"),
                     APIBase.get("api/v2/product?orderBy=id&order=DESC&page=0&size=8&category=6"),
-                    APIBase.get("api/v1/category/1")
+                    APIBase.get("api/v1/category/1").catch(e => {
+                        console.error("[Home] Category API Error (Handled):", e.message);
+                        return { data: { children: [] } }; // Fallback
+                    })
                 ]);
 
-                // Batch state updates - React 18 automatically batches these
-                setNewests(newestPayload.data);
-                setAccessories(accessoriesPayload.data);
-                setmonitors(monitorsPayload.data);
+                // Batch updates
+                if (newestPayload?.data) setNewests(newestPayload.data);
+                if (accessoriesPayload?.data) setAccessories(accessoriesPayload.data);
+                if (monitorsPayload?.data) setmonitors(monitorsPayload.data);
 
-                const rootCategory = categoriesPayload.data;
+                const rootCategory = categoriesPayload?.data;
                 if (rootCategory && rootCategory.children) {
                     const topCategories = rootCategory.children.slice(0, 6).map(cat => ({
                         id: cat.id,
@@ -85,19 +87,20 @@ function Home() {
                     setCategories(topCategories);
                 }
 
-                // Mark successful completion - this will prevent any further re-fetch from this instance
-                hasFetchedRef.current = true;
-                console.log("[Home] ✓ All data batches loaded successfully");
-
+                console.log("[Home] ✓ Main content loaded.");
             } catch (err) {
-                console.error("[Home] ❌ Error loading data:", err);
+                console.error("[Home] ❌ Critical Fetch Error:", err);
+                // On critical error, allow a retry attempt on next remount if needed
+                hasFetchedRef.current = false; 
+            } finally {
+                setIsLoading(false);
             }
         };
 
         fetchAllData();
-    }, [authState]); // STRICT: Depends ONLY on authState transition
+    }, []); // Run ONCE on mount
 
-    // Derived State - Logic moved to render scope for lightweight identity checks
+    // Derived State
     const isAuthenticated = useMemo(() => authState === 1 && user && hasRole("USER"), [authState, user, hasRole]);
     const userName = useMemo(() => user ? `${user.firstname || ""} ${user.lastname || ""}`.trim() : "", [user]);
 
@@ -118,7 +121,7 @@ function Home() {
     
     return (
         <div className={style.homeContainer}>
-            {/* Hero Section with Carousel */}
+            {/* Hero Section */}
             <div className={style.heroSection}>
                 <Carousel autoplay effect="fade" className={style.heroCarousel} autoplaySpeed={5000}>
                     {carouselContent.map((item, index) => (
@@ -143,7 +146,7 @@ function Home() {
                 </Carousel>
             </div>
 
-            {/* Welcome Message (Authenticated only) */}
+            {/* Welcome Message (Dynamic based on authState) */}
             {isAuthenticated && userName && (
                 <Row justify="center" className={style.welcomeSection}>
                     <Col xs={24} sm={22} md={20} lg={18}>
@@ -156,7 +159,7 @@ function Home() {
             )}
 
             {/* Category Grid */}
-            {categories.length > 0 && (
+            {categories.length > 0 ? (
                 <div className={style.categorySection}>
                     <Row justify="center">
                         <Col xs={24} sm={22} md={20} lg={18}>
@@ -178,7 +181,7 @@ function Home() {
                         </Col>
                     </Row>
                 </div>
-            )}
+            ) : null}
 
             {/* Product Sections */}
             {[
@@ -191,18 +194,22 @@ function Home() {
                         <Col xs={24} sm={22} md={20} lg={18}>
                             <div className={style.sectionHeader}>
                                 <Title level={2} className={style.sectionTitle}>{section.title}</Title>
-                                <Button type="link" onClick={() => navigate(section.link)}>See All →</Button>
+                                <Button type="button" type="link" onClick={() => navigate(section.link)}>See All →</Button>
                             </div>
                             <Row gutter={[16, 24]} className={style.productGrid}>
-                                {section.data.content.map((product, pIndex) => (
-                                    <Col xs={24} sm={12} md={8} lg={6} key={product.id || pIndex}>
-                                        <ProductCardv2 
-                                            data={product} 
-                                            className={style.productCard}
-                                            showBadge={sIndex === 0 && pIndex < 3}
-                                        />
-                                    </Col>
-                                ))}
+                                {section.data && section.data.content && section.data.content.length > 0 ? (
+                                    section.data.content.map((product, pIndex) => (
+                                        <Col xs={24} sm={12} md={8} lg={6} key={product.id || pIndex}>
+                                            <ProductCardv2 
+                                                data={product} 
+                                                className={style.productCard}
+                                                showBadge={sIndex === 0 && pIndex < 3}
+                                            />
+                                        </Col>
+                                    ))
+                                ) : (
+                                    <Col span={24}><div style={{textAlign: 'center', padding: '20px'}}>No products found.</div></Col>
+                                )}
                             </Row>
                         </Col>
                     </Row>

@@ -6,17 +6,21 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 /**
  * useAuth Hook - Manages authentication state and user data
  * 
- * Optimized Version (Senior Performance Engineer Edition):
- * - Removed circular dependency: requestAuth is now stable and doesn't depend on state/user
- * - Uses functional state updates and mutable refs for internal guards
- * - Prevents redundant re-renders and bridge evaluation cycles
+ * Performance Refactor (Lag & Loop Fix Edition):
+ * - Removed requestAnimationFrame: Immediate state updates to eliminate stutter.
+ * - Decoupled dependencies: requestAuth is stable, and main effect bails out early.
+ * - Standardized loading/loaded: state transitions are eager but guarded.
  */
 function normalizeRoles(roles) {
   if (!roles) return [];
   return roles
     .map((r) => {
-      if (!r?.name) return null;
-      return r.name.toUpperCase().replace(/^ROLE_/, "");
+      let roleName = null;
+      if (typeof r === "string") roleName = r;
+      else if (typeof r === "object" && r !== null && r.name) roleName = r.name;
+      
+      if (!roleName) return null;
+      return roleName.toUpperCase().replace(/^ROLE_/, "");
     })
     .filter(Boolean);
 }
@@ -26,130 +30,89 @@ function useAuth() {
   const [state, setState] = useState(2); // 2 = loading, 1 = loaded
   const dispatch = useDispatch();
   
-  // Refs are the backbone of a stable auth hook - they don't trigger re-renders
   const hasRequestedRef = useRef(false);
-  const requestAuthInProgressRef = useRef(false);
+  const inProgressRef = useRef(false);
 
-  // Sync state 1-loading to 2-loaded if user exists in Redux (login flow)
+  // Sync state if user arrives via login (Redux updates)
   useEffect(() => {
-    if (user === null && hasRequestedRef.current) {
-      hasRequestedRef.current = false; // Reset on logout
-    }
-    if (user && state !== 1) {
-      setState(1);
-    }
+    if (user === null && hasRequestedRef.current) hasRequestedRef.current = false;
+    if (user && state !== 1) setState(1);
   }, [user, state]);
 
   /**
-   * requestAuth - STABLE reference
-   * Dependencies: [dispatch]
-   * Why: state and user are handled via internal refs or Redux, keeping the function reference identical 
-   * throughout the entire application lifecycle unless dispatch somehow changes.
+   * requestAuth - STABLE (Depends ONLY on dispatch)
    */
   const requestAuth = useCallback(() => {
-    // GUARD: If already requested or in progress, BAIL OUT
-    if (hasRequestedRef.current || requestAuthInProgressRef.current) {
-      return Promise.resolve(null);
-    }
-
+    if (hasRequestedRef.current || inProgressRef.current) return Promise.resolve(null);
+    
     const token = window.localStorage.getItem("AUTH_TOKEN");
-    if (!token || token.trim() === "") {
-      setState(1); // Set state to loaded (guest)
+    if (!token?.trim()) {
+      setState(1);
       hasRequestedRef.current = true;
       return Promise.resolve(null);
     }
 
-    setState(2); // Set loading state
-    requestAuthInProgressRef.current = true;
+    setState(2); // Loading
+    inProgressRef.current = true;
     hasRequestedRef.current = true;
 
-    return APIBase.get("/api/v1/auth/user")
-      .then((payload) => payload.data)
-      .then((data) => {
-        requestAuthInProgressRef.current = false;
-        if (data) {
-          // Normalize roles
-          if (data.account && data.account.roles && Array.isArray(data.account.roles)) {
-            const normalizedRoleNames = normalizeRoles(data.account.roles);
-            data.account.roles = normalizedRoleNames.map((name) => ({ name }));
-          }
-          
-          dispatch(userSlide.actions.create(data));
-          
-          // Double RAF is a browser-safe way to ensure Redux propagation before state change
-          return new Promise((resolve) => {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                setState(1);
-                resolve(data);
-              });
-            });
-          });
-        } else {
-          setState(1);
-          return null;
+    return APIBase.get("/api/v1/auth/user").then(p => p.data).then(data => {
+      inProgressRef.current = false;
+      if (data) {
+        if (data.account?.roles) {
+          const normalized = normalizeRoles(data.account.roles);
+          data.account.roles = normalized.map(name => ({ name }));
         }
-      })
-      .catch((e) => {
-        requestAuthInProgressRef.current = false;
-        setState(1);
-        throw e;
-      });
-  }, [dispatch]); // STABLE: No dependency on state/user
+        dispatch(userSlide.actions.create(data));
+        setState(1); // Immediate finish (Removed RAF)
+        return data;
+      }
+      setState(1);
+      return null;
+    }).catch(e => {
+      inProgressRef.current = false;
+      setState(1);
+      throw e;
+    });
+  }, [dispatch]);
 
   /**
-   * Auto-fetch user on mount
+   * Mount Effect
    */
   useEffect(() => {
-    // If user already exists in Redux or we already requested, bail out
+    // If already checking, or redundant (user in Redux), bail
     if (hasRequestedRef.current || (user && user.id)) {
-      if (user && user.id && state !== 1) setState(1);
+      if (user?.id && state !== 1) setState(1);
       return;
     }
 
     const token = window.localStorage.getItem("AUTH_TOKEN");
-    if (token && token.trim() !== "") {
-      requestAuth().catch(() => {
-        // Silent fail on mount, just set to loaded
-        setState(1);
-      });
+    if (token?.trim()) {
+      requestAuth().catch(() => setState(1));
     } else {
       setState(1);
       hasRequestedRef.current = true;
     }
-  }, [requestAuth, user, state]); // Refers to stable requestAuth
+  }, [requestAuth, user]); // Removed 'state' from deps to prevent re-render noise
 
   /**
-   * role() - Memoized normalized user roles
+   * role() & hasRole - Memoized
    */
   const role = useMemo(() => {
     if (state !== 1) return null;
-    if (!user) return ["GUEST"];
-    if (!user.account || !user.account.roles || !Array.isArray(user.account.roles)) return ["GUEST"];
-
+    if (!user?.account?.roles) return ["GUEST"];
     const roles = user.account.roles
-      .map((roleObj) => {
-        let roleName = typeof roleObj === "object" ? roleObj.name : roleObj;
-        return (roleName || "").toUpperCase().replace(/^ROLE_/, "");
-      })
+      .map(r => (typeof r === "string" ? r : r.name).toUpperCase().replace(/^ROLE_/, ""))
       .filter(Boolean);
-
     return roles.length > 0 ? roles : ["GUEST"];
   }, [state, user]);
 
-  /**
-   * hasRole - STABLE memoized function
-   */
-  const hasRole = useCallback(
-    (required) => {
-      if (role === null) return null;
-      if (!required) return true;
-      
-      const check = (r) => role.includes((r || "").toUpperCase().replace(/^ROLE_/, ""));
-      return Array.isArray(required) ? required.some(check) : check(required);
-    },
-    [role]
-  );
+  const hasRole = useCallback(r => {
+    if (role === null) return null;
+    if (!r) return true;
+    const check = (i) => role.includes((i || "").toUpperCase().replace(/^ROLE_/, ""));
+    return Array.isArray(r) ? r.some(check) : check(r);
+  }, [role]);
 
   return [state, user, hasRole, requestAuth];
 }
