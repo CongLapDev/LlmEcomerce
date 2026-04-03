@@ -32,7 +32,7 @@ public class JwtFilter extends OncePerRequestFilter {
     private JwtProvider jwtProvider;
 
     // List of paths that should skip JWT processing (permitAll endpoints)
-    private static final String[] PERMIT_ALL_PATHS = {
+    private static final String[] ALWAYS_PERMIT_PATHS = {
             // Authentication endpoints
             "/test/", "/login", "/api/auth/login", "/register", "/refresh", "/logout",
             "/api/v1/auth/logout", 
@@ -54,8 +54,10 @@ public class JwtFilter extends OncePerRequestFilter {
             
             // Actuator
             "/actuator/",
-            
-            // PUBLIC READ APIs (no authentication required for GET)
+    };
+
+    // PUBLIC READ APIs where only GET should bypass JWT processing
+    private static final String[] PUBLIC_GET_ONLY_PATHS = {
             "/api/v1/category",
             "/api/v1/product",
             "/api/v2/product",
@@ -73,9 +75,18 @@ public class JwtFilter extends OncePerRequestFilter {
             log.debug("[JwtFilter] Skipping JWT for OPTIONS (CORS preflight): {}", requestPath);
             return true;
         }
+
+        // Public read APIs: only GET should skip JWT
+        if ("GET".equalsIgnoreCase(httpMethod)) {
+            boolean isPublicGetPath = Arrays.stream(PUBLIC_GET_ONLY_PATHS)
+                    .anyMatch(requestPath::startsWith);
+            if (isPublicGetPath) {
+                return true;
+            }
+        }
         
         // Check if path is in permit list
-        return Arrays.stream(PERMIT_ALL_PATHS).anyMatch(requestPath::startsWith);
+        return Arrays.stream(ALWAYS_PERMIT_PATHS).anyMatch(requestPath::startsWith);
     }
 
     @Override
