@@ -2,6 +2,7 @@ package com.nhs.individual.controller;
 
 import com.nhs.individual.domain.Category;
 import com.nhs.individual.domain.Product;
+import com.nhs.individual.dto.CategoryDto;
 import com.nhs.individual.exception.ResourceNotFoundException;
 import com.nhs.individual.service.CategoryService;
 import com.nhs.individual.service.ProductService;
@@ -32,6 +33,12 @@ public class CategoryController {
     public Category findById(@PathVariable(name = "category_id") Integer id){
         return categoryService.findById(id).orElseThrow(()->  new ResourceNotFoundException("Could not find category with id: "+id));
     }
+
+    @RequestMapping(value = "/{category_id}/children-summary", method = RequestMethod.GET)
+    public List<CategoryDto> findChildrenSummary(@PathVariable(name = "category_id") Integer id) {
+        return categoryService.findCategorySummariesByParentId(id);
+    }
+
     @RequestMapping(method = RequestMethod.POST)
     @PreAuthorize("hasAuthority('ADMIN')")
     public Category create(@RequestBody Category category){

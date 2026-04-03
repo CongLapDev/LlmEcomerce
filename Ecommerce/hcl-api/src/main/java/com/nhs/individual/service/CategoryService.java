@@ -1,6 +1,7 @@
 package com.nhs.individual.service;
 
 import com.nhs.individual.domain.Category;
+import com.nhs.individual.dto.CategoryDto;
 import com.nhs.individual.exception.DuplicateElementException;
 import com.nhs.individual.exception.ResourceNotFoundException;
 import com.nhs.individual.repository.CategoryRepository;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class CategoryService {
@@ -34,6 +36,13 @@ public class CategoryService {
     }
     public Collection<Category> findAllByParentId(int parentId){
         return categoryRepository.findAllByParentId(parentId);
+    }
+
+    public List<CategoryDto> findCategorySummariesByParentId(int parentId){
+        return categoryRepository.findAllByParentId(parentId)
+                .stream()
+                .map(CategoryDto::new)
+                .collect(Collectors.toList());
     }
 
     public Category updateCategory(int id,Category category){

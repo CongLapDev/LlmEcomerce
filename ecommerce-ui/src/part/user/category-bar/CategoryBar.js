@@ -5,6 +5,11 @@ import clsx from "clsx";
 import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import APIBase from "../../../api/ApiBase";
+import {
+  fetchRootCategoryChildrenSummary,
+  getCachedCategoryBarData,
+  setCachedCategoryBarData,
+} from "../../../api/category";
 
 // Icon mapping for common category names
 const getCategoryIcon = (categoryName) => {
@@ -53,52 +58,42 @@ function CategoryBar({ className }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch categories from API - extract only first-level categories (root.children)
+    const cachedCategories = getCachedCategoryBarData();
+    if (Array.isArray(cachedCategories) && cachedCategories.length > 0) {
+      setCategories(cachedCategories.map(transformCategory));
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
     const loadCategories = async () => {
       try {
-        console.log(
-          "[CategoryBar] Fetching categories from /api/v1/category/1...",
-        );
+        const summary = await fetchRootCategoryChildrenSummary(1);
 
-        const payload = await APIBase.get("/api/v1/category/1");
-        console.log("[CategoryBar] API Response:", payload?.data);
-
-        // Extract only first-level categories from root
-        const rootCategory = payload?.data;
-        const categories = rootCategory?.children || [];
-
-        if (Array.isArray(categories) && categories.length > 0) {
-          console.log(
-            `[CategoryBar] Successfully loaded ${categories.length} categories:`,
-            categories.map((cat) => ({ id: cat.id, name: cat.name })),
-          );
-          setCategories(categories.map(transformCategory));
+        if (Array.isArray(summary) && summary.length > 0) {
+          setCachedCategoryBarData(summary);
+          setCategories(summary.map(transformCategory));
           setLoading(false);
           return;
-        } else {
-          console.warn(
-            "[CategoryBar] No children found in root category or empty array",
-          );
         }
       } catch (err) {
-        console.error(
-          "[CategoryBar] Error fetching root category:",
-          err.message,
-        );
+        // Fallback is handled below for backward compatibility.
       }
 
-      // Fallback: try fetching all categories
+      // Fallback for older backend deployments that don't have summary endpoint yet.
       try {
-        console.log(
-          "[CategoryBar] Fallback: Fetching all categories from /api/v1/category...",
-        );
+        const rootPayload = await APIBase.get("/api/v1/category/1");
+        const rootChildren = rootPayload?.data?.children;
+        if (Array.isArray(rootChildren) && rootChildren.length > 0) {
+          setCachedCategoryBarData(rootChildren);
+          setCategories(rootChildren.map(transformCategory));
+          setLoading(false);
+          return;
+        }
 
         const payload = await APIBase.get("/api/v1/category");
         const list = Array.isArray(payload?.data) ? payload.data : [];
-
-        console.log(`[CategoryBar] Fallback returned ${list.length} items`);
 
         // Keep top-level categories only (no parent)
         const topLevel = list.filter(
@@ -108,13 +103,9 @@ function CategoryBar({ className }) {
         );
 
         const categoriesToDisplay = topLevel.length > 0 ? topLevel : list;
-        console.log(
-          `[CategoryBar] Displaying ${categoriesToDisplay.length} top-level categories`,
-        );
-
+        setCachedCategoryBarData(categoriesToDisplay);
         setCategories(categoriesToDisplay.map(transformCategory));
       } catch (err) {
-        console.error("[CategoryBar] Error fetching categories:", err.message);
         setCategories([]);
       } finally {
         setLoading(false);
