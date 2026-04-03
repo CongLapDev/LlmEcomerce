@@ -39,6 +39,11 @@ public class CategoryController {
         return categoryService.findCategorySummariesByParentId(id);
     }
 
+    @RequestMapping(value = "/{category_id}/descendant-ids", method = RequestMethod.GET)
+    public List<Integer> findDescendantIds(@PathVariable(name = "category_id") Integer id) {
+        return categoryService.findDescendantIds(id);
+    }
+
     @RequestMapping(method = RequestMethod.POST)
     @PreAuthorize("hasAuthority('ADMIN')")
     public Category create(@RequestBody Category category){

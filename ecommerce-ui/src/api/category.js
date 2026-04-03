@@ -65,6 +65,13 @@ export const fetchRootCategoryChildrenSummary = async (rootId = 1) => {
   return Array.isArray(response?.data) ? response.data : [];
 };
 
+export const fetchCategoryDescendantIds = async (categoryId) => {
+  const response = await APIBase.get(
+    `/api/v1/category/${categoryId}/descendant-ids`,
+  );
+  return Array.isArray(response?.data) ? response.data : [];
+};
+
 export const getCachedCategoryBarData = () => {
   return readCategoryBarCache();
 };

@@ -11,13 +11,7 @@ import java.util.List;
 
 public interface IProductSpecificationV2 extends GeneralSpecification<ProductOverView> {
     static Specification<ProductOverView> inCategory(List<Integer> categoryId) {
-        return (root, criteriaQuery, criteriaBuilder) -> {
-            Predicate[] predicates = new Predicate[categoryId.size()];
-            for (int i = 0; i < categoryId.size(); i++) {
-                predicates[i] = criteriaBuilder.equal(root.get(ProductOverView_.CATEGORY_ID), categoryId.get(i));
-            }
-            return criteriaBuilder.or(predicates);
-        };
+        return (root, criteriaQuery, criteriaBuilder) -> root.get(ProductOverView_.CATEGORY_ID).in(categoryId);
     }
     static Specification<ProductOverView> priceLimit(BigDecimal minPrice, BigDecimal maxPrice) {
         return (root, criteriaQuery, criteriaBuilder) -> criteriaBuilder.and(criteriaBuilder.greaterThanOrEqualTo(root.get(ProductOverView_.MIN_PRICE),minPrice),

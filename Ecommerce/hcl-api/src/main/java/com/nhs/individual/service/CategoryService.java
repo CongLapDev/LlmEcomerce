@@ -9,9 +9,13 @@ import com.nhs.individual.utils.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,6 +47,32 @@ public class CategoryService {
                 .stream()
                 .map(CategoryDto::new)
                 .collect(Collectors.toList());
+    }
+
+    public List<Integer> findDescendantIds(int rootCategoryId) {
+        Set<Integer> visited = new HashSet<>();
+        List<Integer> result = new ArrayList<>();
+        ArrayDeque<Integer> queue = new ArrayDeque<>();
+        queue.add(rootCategoryId);
+
+        while (!queue.isEmpty()) {
+            Integer currentId = queue.poll();
+            if (currentId == null || visited.contains(currentId)) {
+                continue;
+            }
+
+            visited.add(currentId);
+            result.add(currentId);
+
+            Collection<Category> children = categoryRepository.findAllByParentId(currentId);
+            for (Category child : children) {
+                if (child != null && child.getId() != null && !visited.contains(child.getId())) {
+                    queue.add(child.getId());
+                }
+            }
+        }
+
+        return result;
     }
 
     public Category updateCategory(int id,Category category){

@@ -6,222 +6,201 @@ import { useContext, useEffect, useState } from "react";
 import APIBase from "../../../api/ApiBase";
 import { GlobalContext } from "../../../context";
 import { ProductCardv2 } from "../../../components";
-import style from './style.module.scss';
-
-// Helper function to recursively collect all category IDs (parent + all descendants)
-function getAllCategoryIds(category) {
-    const ids = [category.id];
-    if (category.children && category.children.length > 0) {
-        category.children.forEach(child => {
-            ids.push(...getAllCategoryIds(child));
-        });
-    }
-    return ids;
-}
+import style from "./style.module.scss";
+import { fetchCategoryDescendantIds } from "../../../api/category";
 
 function SearchProductPage() {
-    const [urlParams, setUrlParams] = useSearchParams();
+  const [urlParams, setUrlParams] = useSearchParams();
 
-    // Derive controlled value for price filter from URL params
-    const priceMin = urlParams.get('price-min');
-    const priceMax = urlParams.get('price-max');
-    const filterValue = priceMin && priceMax
-        ? `${priceMin}-${priceMax}`
-        : priceMin
-            ? priceMin
-            : undefined;
+  // Derive controlled value for price filter from URL params
+  const priceMin = urlParams.get("price-min");
+  const priceMax = urlParams.get("price-max");
+  const filterValue =
+    priceMin && priceMax
+      ? `${priceMin}-${priceMax}`
+      : priceMin
+        ? priceMin
+        : undefined;
 
-    const handleReset = () => {
-        setUrlParams(prev => {
-            const newParams = new URLSearchParams(prev);
-            newParams.delete('price-min');
-            newParams.delete('price-max');
-            newParams.delete('orderBy');
-            newParams.delete('order');
-            newParams.set('page', '0');
-            return newParams;
-        });
-    };
-
-    const [data, setData] = useState({
-        content: [],
-        pageable: {
-            pageSize: 0,
-            pageNumber: 0
-        },
-        totalElements: 0,
-        totalPages: 0
+  const handleReset = () => {
+    setUrlParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      newParams.delete("price-min");
+      newParams.delete("price-max");
+      newParams.delete("orderBy");
+      newParams.delete("order");
+      newParams.set("page", "0");
+      return newParams;
     });
-    const globalContext = useContext(GlobalContext);
-    
-    useEffect(() => {
-        // Build API parameters from URL params
-        const apiParam = new URLSearchParams(urlParams);
-        
-        // Get category parameter
-        const categoryId = apiParam.get('category');
-        
-        // If category is specified, fetch category details to get all subcategories
-        if (categoryId) {
-            APIBase.get(`/api/v1/category/${categoryId}`)
-                .then(categoryResponse => {
-                    const category = categoryResponse.data;
-                    
-                    // Collect all category IDs (parent + all children recursively)
-                    const allCategoryIds = getAllCategoryIds(category);
-                    
-                    console.log('[SearchProductPage] Category:', category.name);
-                    console.log('[SearchProductPage] All category IDs (including subcategories):', allCategoryIds);
-                    
-                    // Remove the single category param and add all category IDs
-                    apiParam.delete('category');
-                    allCategoryIds.forEach(id => {
-                        apiParam.append('category', id.toString());
-                    });
-                    
-                    // Ensure default page size if not specified
-                    if (!apiParam.has('size')) {
-                        apiParam.set('size', '20');
-                    }
-                    
-                    // Ensure default page number if not specified
-                    if (!apiParam.has('page')) {
-                        apiParam.set('page', '0');
-                    }
-                    
-                    console.log('[SearchProductPage] API params with all category IDs:', apiParam.toString());
-                    
-                    // Fetch products with all category IDs
-                    return APIBase.get(`/api/v2/product?${apiParam.toString()}`)
-                        .then(payload => {
-                            console.log('[SearchProductPage] Products received:', payload.data?.content?.length || 0, 'products');
-                            return payload.data;
-                        });
-                })
-                .then(setData)
-                .catch(e => {
-                    console.error('[SearchProductPage] Error fetching products:', e);
-                    console.error('[SearchProductPage] Error response:', e.response?.data);
-                    globalContext.message.error("Error while fetching products");
-                });
-        } else {
-            // No category specified, fetch products normally
-            // Ensure default page size if not specified
-            if (!apiParam.has('size')) {
-                apiParam.set('size', '20');
-            }
-            
-            // Ensure default page number if not specified
-            if (!apiParam.has('page')) {
-                apiParam.set('page', '0');
-            }
-            
-            console.log('[SearchProductPage] No category filter, fetching all products');
-            console.log('[SearchProductPage] API params:', apiParam.toString());
-            
-            APIBase.get(`/api/v2/product?${apiParam.toString()}`)
-                .then(payload => {
-                    console.log('[SearchProductPage] Products received:', payload.data?.content?.length || 0, 'products');
-                    return payload.data;
-                })
-                .then(setData)
-                .catch(e => {
-                    console.error('[SearchProductPage] Error fetching products:', e);
-                    console.error('[SearchProductPage] Error response:', e.response?.data);
-                    globalContext.message.error("Error while fetching products");
-                });
-        }
-    }, [urlParams, globalContext])
+  };
 
-    return (
-        <Row gutter={{ xs: 6, sm: 8, md: 12, lg: 16 }}>
-            <Col span={24}>
-                <h2>Search Result</h2>
+  const [data, setData] = useState({
+    content: [],
+    pageable: {
+      pageSize: 0,
+      pageNumber: 0,
+    },
+    totalElements: 0,
+    totalPages: 0,
+  });
+  const globalContext = useContext(GlobalContext);
+
+  useEffect(() => {
+    // Build API parameters from URL params
+    const apiParam = new URLSearchParams(urlParams);
+
+    // Get category parameter
+    const categoryId = apiParam.get("category");
+
+    // If category is specified, fetch category details to get all subcategories
+    if (categoryId) {
+      fetchCategoryDescendantIds(categoryId)
+        .then((allCategoryIds) => {
+          // Remove the single category param and add all category IDs
+          apiParam.delete("category");
+          if (Array.isArray(allCategoryIds) && allCategoryIds.length > 0) {
+            allCategoryIds.forEach((id) => {
+              apiParam.append("category", id.toString());
+            });
+          } else {
+            apiParam.set("category", categoryId);
+          }
+
+          // Ensure default page size if not specified
+          if (!apiParam.has("size")) {
+            apiParam.set("size", "20");
+          }
+
+          // Ensure default page number if not specified
+          if (!apiParam.has("page")) {
+            apiParam.set("page", "0");
+          }
+
+          // Fetch products with all category IDs
+          return APIBase.get(`/api/v2/product?${apiParam.toString()}`).then(
+            (payload) => payload.data,
+          );
+        })
+        .then(setData)
+        .catch((e) => {
+          globalContext.message.error("Error while fetching products");
+        });
+    } else {
+      // No category specified, fetch products normally
+      // Ensure default page size if not specified
+      if (!apiParam.has("size")) {
+        apiParam.set("size", "20");
+      }
+
+      // Ensure default page number if not specified
+      if (!apiParam.has("page")) {
+        apiParam.set("page", "0");
+      }
+
+      APIBase.get(`/api/v2/product?${apiParam.toString()}`)
+        .then((payload) => payload.data)
+        .then(setData)
+        .catch((e) => {
+          globalContext.message.error("Error while fetching products");
+        });
+    }
+  }, [urlParams, globalContext.message]);
+
+  return (
+    <Row gutter={{ xs: 6, sm: 8, md: 12, lg: 16 }}>
+      <Col span={24}>
+        <h2>Search Result</h2>
+      </Col>
+      <Col span={24}>
+        <Row className={style.filter} gutter={[16, 16]}>
+          <Col span={12} md={{ span: 8 }} style={{ overflowX: "scroll" }}>
+            <ProductFilter
+              value={filterValue}
+              onFilter={(params_) => {
+                setUrlParams((prev) => {
+                  const newParams = new URLSearchParams(prev);
+                  params_.entries().forEach(([key, value]) => {
+                    if (value) newParams.set(key, value);
+                    else newParams.delete(key);
+                  });
+                  newParams.set("page", "0");
+                  return newParams;
+                });
+              }}
+            />
+          </Col>
+          <Col span={12} md={{ span: 6 }}>
+            <Select
+              style={{ width: "100%" }}
+              placeholder="Sort by"
+              value={
+                urlParams.get("order")
+                  ? urlParams.get("order").toUpperCase()
+                  : "DEFAULT"
+              }
+              onChange={(value) => {
+                setUrlParams((prev) => {
+                  const newParams = new URLSearchParams(prev);
+                  if (value && value !== "DEFAULT") {
+                    newParams.set("orderBy", "minPrice");
+                    newParams.set("order", value);
+                  } else {
+                    newParams.delete("orderBy");
+                    newParams.delete("order");
+                  }
+                  newParams.set("page", "0");
+                  return newParams;
+                });
+              }}
+              options={[
+                { label: "Default", value: "DEFAULT" },
+                { label: "Price: High → Low", value: "DESC" },
+                { label: "Price: Low → High", value: "ASC" },
+              ]}
+            />
+          </Col>
+          <Col flex="none">
+            <Tooltip title="Clear filters & sorting">
+              <Button onClick={handleReset} icon={<ReloadOutlined />}>
+                Reset
+              </Button>
+            </Tooltip>
+          </Col>
+        </Row>
+      </Col>
+      <Col span={24}>
+        <Row gutter={[16, 16]}>
+          {data.content.map((product_, index) => (
+            <Col key={index} span={12} md={{ span: 6 }} lg={{ span: 4 }}>
+              <ProductCardv2 data={product_} />
             </Col>
-            <Col span={24}>
-                <Row className={style.filter} gutter={[16, 16]}>
-                    <Col span={12} md={{ span: 8 }} style={{ overflowX: "scroll" }}>
-                        <ProductFilter
-                            value={filterValue}
-                            onFilter={params_ => {
-                                setUrlParams(prev => {
-                                    const newParams = new URLSearchParams(prev);
-                                    params_.entries().forEach(([key, value]) => {
-                                        if (value) newParams.set(key, value);
-                                        else newParams.delete(key);
-                                    });
-                                    newParams.set('page', '0');
-                                    return newParams;
-                                })
-                            }}
-                        />
-                    </Col>
-                    <Col span={12} md={{ span: 6 }}>
-                        <Select
-                            style={{ width: "100%" }}
-                            placeholder="Sort by"
-                            value={urlParams.get('order') ? urlParams.get('order').toUpperCase() : "DEFAULT"}
-                            onChange={(value) => {
-                                setUrlParams(prev => {
-                                    const newParams = new URLSearchParams(prev);
-                                    if (value && value !== "DEFAULT") {
-                                        newParams.set('orderBy', 'minPrice');
-                                        newParams.set('order', value);
-                                    } else {
-                                        newParams.delete('orderBy');
-                                        newParams.delete('order');
-                                    }
-                                    newParams.set('page', '0');
-                                    return newParams;
-                                });
-                            }}
-                            options={[
-                                { label: "Default", value: "DEFAULT" },
-                                { label: "Price: High → Low", value: "DESC" },
-                                { label: "Price: Low → High", value: "ASC" }
-                            ]}
-                        />
-                    </Col>
-                    <Col flex="none">
-                        <Tooltip title="Clear filters & sorting">
-                            <Button
-                                onClick={handleReset}
-                                icon={<ReloadOutlined />}
-                            >
-                                Reset
-                            </Button>
-                        </Tooltip>
-                    </Col>
-                </Row>
-            </Col>
-            <Col span={24}>
-                <Row gutter={[16, 16]}>
-                    {data.content.map((product_, index) => <Col key={index} span={12} md={{ span: 6 }} lg={{ span: 4 }} ><ProductCardv2 data={product_} /></Col>)}
-                </Row>
-            </Col>
-            <Col span={24}>
-                {data && data.pageable && (
-                    <Flex justify="end">
-                        <Pagination 
-                            pageSize={data.pageable?.pageSize || 20} 
-                            current={(data.pageable?.pageNumber || 0) + 1} 
-                            total={data.totalElements || 0}
-                            showSizeChanger={false}
-                            onChange={(page, pageSize) => {
-                                setUrlParams(prev => {
-                                    const newParams = new URLSearchParams(prev);
-                                    newParams.set('page', String(page - 1)); // Backend uses 0-based indexing
-                                    if (pageSize) {
-                                        newParams.set('size', String(pageSize));
-                                    }
-                                    return newParams;
-                                });
-                            }}
-                        />
-                    </Flex>
-                )}
-            </Col>
-        </Row>);
+          ))}
+        </Row>
+      </Col>
+      <Col span={24}>
+        {data && data.pageable && (
+          <Flex justify="end">
+            <Pagination
+              pageSize={data.pageable?.pageSize || 20}
+              current={(data.pageable?.pageNumber || 0) + 1}
+              total={data.totalElements || 0}
+              showSizeChanger={false}
+              onChange={(page, pageSize) => {
+                setUrlParams((prev) => {
+                  const newParams = new URLSearchParams(prev);
+                  newParams.set("page", String(page - 1)); // Backend uses 0-based indexing
+                  if (pageSize) {
+                    newParams.set("size", String(pageSize));
+                  }
+                  return newParams;
+                });
+              }}
+            />
+          </Flex>
+        )}
+      </Col>
+    </Row>
+  );
 }
 
 export default SearchProductPage;
