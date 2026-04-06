@@ -137,14 +137,16 @@ function ProductPage() {
                         </Col>
                         <Col span={24}>
                             <Row justify="end">
-                                <Button style={{ backgroundColor: "#333", marginRight: "5px" }} shape="round" icon={<PrefixIcon style={{ color: "white" }}><i className="fi fi-rr-shopping-cart-add"></i></PrefixIcon>} className="mt-2" onClick={() => {
-                                    if (hasRole("USER")) addCard();
-                                    else globalContext.message.info("You need to login first");
-                                }} />
-                                <Button type="primary" shape="round" onClick={() => {
-                                    if (hasRole("USER")) orderNow();
-                                    else globalContext.message.info("You need to login first");
-                                }}>Order Now</Button>
+                                <div className="flex items-center gap-3">
+                                    <Button style={{ backgroundColor: "#333" }} shape="round" icon={<PrefixIcon style={{ color: "white" }}><i className="fi fi-rr-shopping-cart-add"></i></PrefixIcon>} onClick={() => {
+                                        if (hasRole("USER")) addCard();
+                                        else globalContext.message.info("You need to login first");
+                                    }} />
+                                    <Button type="primary" shape="round" onClick={() => {
+                                        if (hasRole("USER")) orderNow();
+                                        else globalContext.message.info("You need to login first");
+                                    }}>Order Now</Button>
+                                </div>
                             </Row>
                         </Col>
                     </Row>
