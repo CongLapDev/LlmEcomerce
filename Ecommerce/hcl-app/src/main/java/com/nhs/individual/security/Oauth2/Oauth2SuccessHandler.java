@@ -51,20 +51,29 @@ public class Oauth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
             String refreshTokenString = refreshToken.getToken();
             
             // Build redirect URL with tokens as query parameters
-            String redirectUrl = frontendUrl + "/auth/success" +
+            String normalizedFrontendUrl = frontendUrl.endsWith("/")
+                    ? frontendUrl.substring(0, frontendUrl.length() - 1)
+                    : frontendUrl;
+
+            String redirectUrl = normalizedFrontendUrl + "/auth/success" +
                     "?access=" + URLEncoder.encode(accessToken, StandardCharsets.UTF_8) +
                     "&refresh=" + URLEncoder.encode(refreshTokenString, StandardCharsets.UTF_8);
             
             // Redirect to frontend with tokens in URL
             response.sendRedirect(redirectUrl);
-            super.onAuthenticationSuccess(request, response, authentication);
+            return;
         } catch (Exception e) {
             // Log error and redirect to frontend error page
             System.err.println("[OAuth2SuccessHandler] Error processing OAuth2 success: " + e.getMessage());
             e.printStackTrace();
             // Redirect to frontend login page with error parameter
-            String errorUrl = frontendUrl + "/login?error=oauth_failed";
-            response.sendRedirect(errorUrl);
+            String normalizedFrontendUrl = frontendUrl.endsWith("/")
+                    ? frontendUrl.substring(0, frontendUrl.length() - 1)
+                    : frontendUrl;
+            String errorUrl = normalizedFrontendUrl + "/login?error=oauth_failed";
+            if (!response.isCommitted()) {
+                response.sendRedirect(errorUrl);
+            }
         }
     }
 }
